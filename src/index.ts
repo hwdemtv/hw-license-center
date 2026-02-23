@@ -15,11 +15,23 @@ function generateLicenseKey(prefix = 'KEY'): string {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// 允许跨域请求，方便 Obsidian 插件前端直接调用
+// 仅允许 Obsidian 插件和自有域名的跨域请求
 app.use('/api/*', cors({
-  origin: '*',
-  allowMethods: ['POST', 'GET', 'OPTIONS'],
+  origin: ['obsidian://', 'app://', 'https://km.hwdemtv.com', 'https://kami.hwdemtv.com', 'https://hw-license-center.hwdemtv.workers.dev'],
+  allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],
 }));
+
+// 简易请求日志
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url} - ${c.res.status} - ${Date.now() - start}ms`);
+});
+
+// 健康检查接口
+app.get('/health', (c) => {
+  return c.json({ status: 'ok', timestamp: Date.now() });
+});
 
 // API: 验证卡密并绑定设备
 app.post('/api/v1/auth/verify', async (c) => {
@@ -123,24 +135,29 @@ app.post('/api/v1/auth/unbind', async (c) => {
 app.post('/api/v1/auth/admin/generate', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    // 使用预设的环境变量密码进行鉴权，如果没有设置则默认只有这一个硬编码密码能过（测试用）
-    const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
+    const expectedSecret = c.env.ADMIN_SECRET;
 
-    if (authHeader !== `Bearer ${expectedSecret} `) {
+    if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问：管理员密钥错误' }, 401);
     }
 
     const { max_devices = 2, count = 1, product_id = 'default', user_name = '' } = await c.req.json().catch(() => ({}));
     const generatedKeys: string[] = [];
+    const statements: D1PreparedStatement[] = [];
 
-    // 批量生成并插入
+    // 批量生成卡密并构建语句
     for (let i = 0; i < count; i++) {
       const newKey = generateLicenseKey(product_id || 'KEY');
-      await c.env.DB.prepare(
-        `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'active', ?)`
-      ).bind(newKey, product_id, user_name, max_devices).run();
       generatedKeys.push(newKey);
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'active', ?)`
+        ).bind(newKey, product_id, user_name, max_devices)
+      );
     }
+
+    // 使用 D1 batch 批量执行，性能远优于逐条插入
+    await c.env.DB.batch(statements);
 
     return c.json({
       success: true,
@@ -162,7 +179,7 @@ app.get('/api/v1/auth/admin/licenses', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
-    if (authHeader !== `Bearer ${expectedSecret} `) {
+    if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
 
@@ -178,7 +195,7 @@ app.get('/api/v1/auth/admin/licenses', async (c) => {
     const params: string[] = [];
 
     if (productId) {
-      query += ` WHERE l.product_id = ? `;
+      query += ` WHERE l.product_id = ?`;
       params.push(productId);
     }
 
@@ -198,7 +215,7 @@ app.post('/api/v1/auth/admin/licenses/status', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
-    if (authHeader !== `Bearer ${expectedSecret} `) {
+    if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
 
@@ -226,7 +243,7 @@ app.post('/api/v1/auth/admin/licenses/user', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
-    if (authHeader !== `Bearer ${expectedSecret} `) {
+    if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
 
@@ -254,7 +271,7 @@ app.delete('/api/v1/auth/admin/licenses', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
-    if (authHeader !== `Bearer ${expectedSecret} `) {
+    if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
 
@@ -284,168 +301,173 @@ app.delete('/api/v1/auth/admin/licenses', async (c) => {
 // API: Web 后台页面 (核心管理控制台)
 app.get('/admin', (c) => {
   const html = `
-    < !DOCTYPE html >
-      <html lang="zh-CN" >
-        <head>
-        <meta charset="UTF-8" >
-          <meta name="viewport" content = "width=device-width, initial-scale=1.0" >
-            <title>互为卡密中心 - 开发者控制台 </title>
-            <style>
-        :root {
-    --bg - color: #0b0d11;
-    --panel - bg: #15191e;
-    --border - color: #2d333b;
-    --text - main: #adbac7;
-    --text - bright: #cdd9e5;
-    --accent: #5385ff;
-    --accent - glow: rgba(83, 133, 255, 0.3);
-    --success: #57ab5a;
-    --warning: #c69026;
-    --danger: #e5534b;
-    --active - bg: #1c2128;
-  }
-        body {
-    margin: 0; font - family: -apple - system, system - ui, sans - serif;
-    background: var(--bg - color); color: var(--text - main); line - height: 1.5;
-  }
-        .container { max - width: 1000px; margin: 40px auto; padding: 0 20px; }
-        .header { display: flex; align - items: center; gap: 15px; margin - bottom: 30px; }
-        .header h1 { font - size: 24px; color: var(--text - bright); margin: 0; }
-        
-        .tabs { display: flex; gap: 5px; margin - bottom: 20px; border - bottom: 1px solid var(--border - color); }
-        .tab {
-    padding: 10px 20px; cursor: pointer; border - radius: 6px 6px 0 0;
-    border: 1px solid transparent; margin - bottom: -1px; transition: 0.2s;
-  }
-        .tab:hover { color: var(--text - bright); background: var(--active - bg); }
-        .tab.active {
-    background: var(--panel - bg); color: var(--accent);
-    border: 1px solid var(--border - color); border - bottom - color: var(--panel - bg);
-    font - weight: 600;
-  }
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>互为卡密中心 - 开发者控制台</title>
+  <style>
+    :root {
+      --bg-color: #0b0d11;
+      --panel-bg: #15191e;
+      --border-color: #2d333b;
+      --text-main: #adbac7;
+      --text-bright: #cdd9e5;
+      --accent: #5385ff;
+      --accent-glow: rgba(83, 133, 255, 0.3);
+      --success: #57ab5a;
+      --warning: #c69026;
+      --danger: #e5534b;
+      --active-bg: #1c2128;
+    }
+    body {
+      margin: 0; font-family: -apple-system, system-ui, sans-serif;
+      background: var(--bg-color); color: var(--text-main); line-height: 1.5;
+    }
+    .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+    .header { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+    .header h1 { font-size: 24px; color: var(--text-bright); margin: 0; }
+    
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+    .tab {
+      padding: 10px 20px; cursor: pointer; border-radius: 6px 6px 0 0;
+      border: 1px solid transparent; margin-bottom: -1px; transition: 0.2s;
+    }
+    .tab:hover { color: var(--text-bright); background: var(--active-bg); }
+    .tab.active {
+      background: var(--panel-bg); color: var(--accent);
+      border: 1px solid var(--border-color); border-bottom-color: var(--panel-bg);
+      font-weight: 600;
+    }
 
-        .section { background: var(--panel - bg); border: 1px solid var(--border - color); border - radius: 12px; padding: 30px; display: none; }
-        .section.active { display: block; }
+    .section { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 30px; display: none; }
+    .section.active { display: block; }
 
-        .form - group { margin - bottom: 20px; }
-        label { display: block; font - size: 13px; margin - bottom: 8px; color: var(--text - muted); }
-  input, select {
-    width: 100 %; padding: 12px; background: #010409; border: 1px solid var(--border - color);
-    border - radius: 6px; color: var(--text - bright); outline: none; box - sizing: border - box;
-  }
-  input:focus { border - color: var(--accent); box - shadow: 0 0 0 3px var(--accent - glow); }
-        
-        .row { display: flex; gap: 15px; }
-        .row > * { flex: 1; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 13px; margin-bottom: 8px; color: #768390; }
+    input, select {
+      width: 100%; padding: 12px; background: #010409; border: 1px solid var(--border-color);
+      border-radius: 6px; color: var(--text-bright); outline: none; box-sizing: border-box;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    
+    .row { display: flex; gap: 15px; }
+    .row > * { flex: 1; }
 
-        button {
-    background: var(--accent); color: white; border: none; padding: 12px 24px;
-    border - radius: 6px; font - weight: 600; cursor: pointer; transition: 0.2s;
-  }
-  button:hover { opacity: 0.9; transform: translateY(-1px); }
-  button.secondary { background: #373e47; color: var(--text - bright); }
-  button.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; font - size: 12px; }
-  button.danger:hover { background: var(--danger); color: white; }
-  button.action - btn { padding: 6px 12px; font - size: 12px; margin - right: 5px; }
-        
-        table { width: 100 %; border - collapse: collapse; margin - top: 20px; font - size: 13px; }
-        th { text - align: left; padding: 12px; border - bottom: 1px solid var(--border - color); color: var(--text - bright); }
-        td { padding: 12px; border - bottom: 1px solid var(--border - color); }
-  tr:hover { background: rgba(255, 255, 255, 0.02); }
+    button {
+      background: var(--accent); color: white; border: none; padding: 12px 24px;
+      border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;
+    }
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    button.secondary { background: #373e47; color: var(--text-bright); }
+    button.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; font-size: 12px; }
+    button.danger:hover { background: var(--danger); color: white; }
+    button.action-btn { padding: 6px 12px; font-size: 12px; margin-right: 5px; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+    th { text-align: left; padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-bright); }
+    td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-        .status - pill { padding: 4px 8px; border - radius: 10px; font - size: 11px; font - weight: 600; }
-        .status - active { background: rgba(87, 171, 90, 0.15); color: var(--success); }
-        .status - revoked { background: rgba(229, 83, 75, 0.15); color: var(--danger); }
-        .status - inactive { background: rgba(198, 144, 38, 0.15); color: var(--warning); }
+    .status-pill { padding: 4px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .status-active { background: rgba(87, 171, 90, 0.15); color: var(--success); }
+    .status-revoked { background: rgba(229, 83, 75, 0.15); color: var(--danger); }
+    .status-inactive { background: rgba(198, 144, 38, 0.15); color: var(--warning); }
 
-        .result - panel { margin - top: 25px; padding: 20px; background: #010409; border - radius: 8px; position: relative; }
-        .code - area { font - family: monospace; white - space: pre - wrap; font - size: 13px; color: var(--success); }
+    .result-panel { margin-top: 25px; padding: 20px; background: #010409; border-radius: 8px; position: relative; }
+    .code-area { font-family: monospace; white-space: pre-wrap; font-size: 13px; color: var(--success); }
 
-  #adminAuth { position: fixed; inset: 0; background: var(--bg - color); display: flex; justify - content: center; align - items: center; z - index: 100; }
-        .login - box { width: 320px; text - align: center; }
+    #adminAuth { position: fixed; inset: 0; background: var(--bg-color); display: flex; justify-content: center; align-items: center; z-index: 100; }
+    .login-box { width: 320px; text-align: center; }
+    .password-container { position: relative; width: 100%; }
+    .toggle-password { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-main); font-size: 18px; user-select: none; }
+    .toggle-password:hover { color: var(--accent); }
   </style>
-    </head>
-    < body >
+<body>
 
-    <div id="adminAuth" >
-      <div class="login-box" >
-        <h2 style="color: var(--text-bright)" > 身份验证 </h2>
-          < div class="form-group" >
-            <input type="password" id = "globalSecret" placeholder = "输入管理员密钥" value = "super-secret-admin-key-2026" >
-              </div>
-              < button onclick = "login()" > 进入控制台 </button>
-                </div>
-                </div>
+<div id="adminAuth">
+  <div class="login-box">
+    <h2 style="color: var(--text-bright)">身份验证</h2>
+    <div class="form-group">
+      <div class="password-container">
+        <input type="password" id="globalSecret" placeholder="默认密钥: super-secret-admin-key-2026" value="super-secret-admin-key-2026">
+        <span class="toggle-password" id="eyeIcon" onclick="toggleSecret()">👁️</span>
+      </div>
+    </div>
+    <button onclick="login()">进入控制台</button>
+  </div>
+</div>
 
-                < div class="container" >
-                  <div class="header" >
-                    <svg xmlns="http://www.w3.org/2000/svg" width = "32" height = "32" viewBox = "0 0 24 24" fill = "none" stroke = "currentColor" stroke - width="2" stroke - linecap="round" stroke - linejoin="round" style = "color:var(--accent)" > <circle cx="12" cy = "12" r = "10" /> <path d="M12 2v4" /> <path d="M12 18v4" /> <path d="M4.93 4.93l2.83 2.83" /> <path d="M16.24 16.24l2.83 2.83" /> <path d="M2 12h4" /> <path d="M18 12h4" /> <path d="M4.93 19.07l2.83-2.83" /> <path d="M16.24 7.76l2.83-2.83" /> </svg>
-                      < h1 > 互为卡密中心 </h1>
-                      </div>
+<div class="container">
+  <div class="header">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><circle cx="12" cy="12" r="10"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+    <h1>互为卡密中心</h1>
+  </div>
 
-                      < div class="tabs" >
-                        <div class="tab active" onclick = "switchTab('generate')" >🔥 极速生卡 </div>
-                          < div class="tab" onclick = "switchTab('manage')" >📊 卡密管理 </div>
-                            </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('generate')">🔥 极速生卡</div>
+    <div class="tab" onclick="switchTab('manage')">📊 卡密管理</div>
+  </div>
 
-                            < !--Tab: Generate-- >
-                              <div id="sec-generate" class="section active" >
-                                <div class="row" >
-                                  <div class="form-group" >
-                                    <label>产品线标识(Product ID) </label>
-                                    < input type = "text" id = "genProductId" value = "default" placeholder = "例如: 您的产品标识" >
-                                      </div>
-                                      < div class="form-group" >
-                                        <label>绑定用户名 / 备注 </label>
-                                        < input type = "text" id = "genUserName" placeholder = "例如: 客户微信名、订单号" >
-                                          </div>
-                                          </div>
-                                          < div class="row" >
-                                            <div class="form-group" >
-                                              <label>单码设备配额 </label>
-                                              < input type = "number" id = "genMaxDevices" value = "2" min = "1" >
-                                                </div>
-                                                < div class="form-group" >
-                                                  <label>生成数量 </label>
-                                                  < input type = "number" id = "genCount" value = "1" min = "1" max = "100" >
-                                                    </div>
-                                                    </div>
-                                                    < button id = "btnDoGen" onclick = "doGenerate()" >✦ 立即自动制卡 </button>
+  <!-- Tab: Generate -->
+  <div id="sec-generate" class="section active">
+    <div class="row">
+      <div class="form-group">
+        <label>产品线标识(Product ID)</label>
+        <input type="text" id="genProductId" value="default" placeholder="例如: 您的产品标识">
+      </div>
+      <div class="form-group">
+        <label>绑定用户名 / 备注</label>
+        <input type="text" id="genUserName" placeholder="例如: 客户微信名、订单号">
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>单码设备配额</label>
+        <input type="number" id="genMaxDevices" value="2" min="1">
+      </div>
+      <div class="form-group">
+        <label>生成数量</label>
+        <input type="number" id="genCount" value="1" min="1" max="100">
+      </div>
+    </div>
+    <button id="btnDoGen" onclick="doGenerate()">✦ 立即自动制卡</button>
 
-                                                      < div id = "genResult" class="result-panel" style = "display:none" >
-                                                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;" > 生成成功，请妥善保存：</div>
-                                                          < div id = "genOutput" class="code-area" > </div>
-                                                            < button class="secondary" style = "margin-top:15px; width:100%" onclick = "copyGenResult()" > 复制全部卡密 </button>
-                                                              </div>
-                                                              </div>
+    <div id="genResult" class="result-panel" style="display:none">
+      <div style="font-size:12px; color:#768390; margin-bottom:10px;">生成成功，请妥善保存：</div>
+      <div id="genOutput" class="code-area"></div>
+      <button class="secondary" style="margin-top:15px; width:100%" onclick="copyGenResult()">复制全部卡密</button>
+    </div>
+  </div>
 
-                                                              < !--Tab: Manage-- >
-                                                                <div id="sec-manage" class="section" >
-                                                                  <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;" >
-                                                                    <div style="flex:1; max-width:300px;" >
-                                                                      <label>筛选产品 </label>
-                                                                      < input type = "text" id = "filterProductId" placeholder = "输入 ID 筛选，留空查所有" oninput = "loadLicenses()" >
-                                                                        </div>
-                                                                        < button class="secondary" onclick = "loadLicenses()" > 刷新列表 </button>
-                                                                          </div>
+  <!-- Tab: Manage -->
+  <div id="sec-manage" class="section">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;">
+      <div style="flex:1; max-width:300px;">
+        <label>筛选产品</label>
+        <input type="text" id="filterProductId" placeholder="输入 ID 筛选，留空查所有" oninput="loadLicenses()">
+      </div>
+      <button class="secondary" onclick="loadLicenses()">刷新列表</button>
+    </div>
 
-                                                                          < table id = "licTable" >
-                                                                            <thead>
-                                                                            <tr>
-                                                                            <th>激活码(Key) </th>
-                                                                            < th > 产品 ID </th>
-                                                                              < th > 用户备注 </th>
-                                                                              < th > 设备(用 / 总) </th>
-                                                                              < th > 状态 </th>
-                                                                              < th > 管理 </th>
-                                                                              </tr>
-                                                                              </thead>
-                                                                              < tbody > </tbody>
-                                                                              </table>
-                                                                              </div>
-                                                                              </div>
+    <table id="licTable">
+      <thead>
+        <tr>
+          <th>激活码(Key)</th>
+          <th>产品 ID</th>
+          <th>用户备注</th>
+          <th>设备(用 / 总)</th>
+          <th>状态</th>
+          <th>管理</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
-                                                                              <script>
+<script>
   let ADMIN_SECRET = "";
 
   function login() {
@@ -456,10 +478,23 @@ app.get('/admin', (c) => {
     loadLicenses();
   }
 
+  function toggleSecret() {
+    const input = document.getElementById('globalSecret');
+    const eye = document.getElementById('eyeIcon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      eye.innerText = '🙈';
+    } else {
+      input.type = 'password';
+      eye.innerText = '👁️';
+    }
+  }
+
   function switchTab(tab) {
+    const target = event.currentTarget || event.target;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    event.target.classList.add('active');
+    target.classList.add('active');
     document.getElementById('sec-' + tab).classList.add('active');
     if (tab === 'manage') loadLicenses();
   }
@@ -540,44 +575,44 @@ app.get('/admin', (c) => {
         } catch (e) { tbody.innerHTML = '<tr><td colspan="6">网络错误</td></tr>'; }
     }
 
-    async function toggleStatus(key, status) {
-        if (!confirm('确定要将 [' + key + '] 的状态更改为 ' + status + ' 吗？')) return;
-        const res = await fetch('/api/v1/auth/admin/licenses/status', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ license_key: key, status })
-        });
-        const data = await res.json();
-        if (data.success) loadLicenses(); else alert(data.msg);
-    }
+  async function toggleStatus(key, status) {
+    if (!confirm('确定要将 [' + key + '] 的状态更改为 ' + status + ' 吗？')) return;
+    const res = await fetch('/api/v1/auth/admin/licenses/status', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_key: key, status })
+    });
+    const data = await res.json();
+    if (data.success) loadLicenses(); else alert(data.msg);
+  }
 
-    async function deleteLic(key) {
-        if (!confirm('⚠️ 高危操作：确定要彻底删除卡密 [' + key + '] 吗？\\n这将同时清除所有已绑定的机器，且不可恢复！')) return;
-        const res = await fetch('/api/v1/auth/admin/licenses', {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ license_key: key })
-        });
-        const data = await res.json();
-        if (data.success) loadLicenses(); else alert(data.msg);
-    }
+  async function deleteLic(key) {
+    if (!confirm('⚠️ 高危操作：确定要彻底删除卡密 [' + key + '] 吗？\\n这将同时清除所有已绑定的机器，且不可恢复！')) return;
+    const res = await fetch('/api/v1/auth/admin/licenses', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_key: key })
+    });
+    const data = await res.json();
+    if (data.success) loadLicenses(); else alert(data.msg);
+  }
 
-    async function editUserName(key, currentName) {
-        const newName = prompt('修改激活码 [' + key + '] 的备注信息：', currentName);
-        if (newName === null) return;
-        const res = await fetch('/api/v1/auth/admin/licenses/user', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ license_key: key, user_name: newName })
-        });
-        const data = await res.json();
-        if (data.success) loadLicenses(); else alert(data.msg);
-    }
+  async function editUserName(key, currentName) {
+    const newName = prompt('修改激活码 [' + key + '] 的备注信息：', currentName);
+    if (newName === null) return;
+    const res = await fetch('/api/v1/auth/admin/licenses/user', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_key: key, user_name: newName })
+    });
+    const data = await res.json();
+    if (data.success) loadLicenses(); else alert(data.msg);
+  }
 
-    function copyGenResult() {
-        navigator.clipboard.writeText(document.getElementById('genOutput').innerText);
-        alert('已复制到剪贴板');
-    }
+  function copyGenResult() {
+    navigator.clipboard.writeText(document.getElementById('genOutput').innerText);
+    alert('已复制到剪贴板');
+  }
 </script>
 
 </body>
