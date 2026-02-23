@@ -109,15 +109,19 @@ npx wrangler deploy src/index.ts
 
 | 文件 | 行号 | 说明 |
 |---|---|---|
-| `src/services/auth-service.ts` | L10 | `AUTH_API_URL` 认证接口基地址 |
+| `src/services/auth-service.ts` | L10-14 | `AUTH_API_URLS` 多域名容灾列表 |
 
-当前值：
+当前值（依次尝试，任一成功即返回）：
 ```typescript
-// smart-mp/src/services/auth-service.ts:10
-private readonly AUTH_API_URL = "https://km.hwdemtv.com/api/v1/auth";
+// smart-mp/src/services/auth-service.ts:10-14
+private readonly AUTH_API_URLS = [
+    "https://km.hwdemtv.com/api/v1/auth",
+    "https://kami.hwdemtv.com/api/v1/auth",
+    "https://hw-license-center.hwdemtv.workers.dev/api/v1/auth",
+];
 ```
 
-> ⚠️ 修改域名后，需要同时更新 Cloudflare Worker 的自定义域名配置（Workers 设置 → 域和路由）。
+> ⚠️ 修改域名后，需要同时更新 Cloudflare Worker 的自定义域名配置（Workers 设置 → 域和路由）以及 `wrangler.toml` 中的 `[[routes]]`。
 
 ---
 
