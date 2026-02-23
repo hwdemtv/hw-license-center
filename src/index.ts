@@ -57,16 +57,37 @@ app.post('/api/v1/auth/verify', async (c) => {
       return c.json({ success: false, msg: '此激活码已被官方停用' }, 403);
     }
 
+    // --- 新增：查询该激活码下的所有产品订阅 ---
+    const { results: subs } = await c.env.DB.prepare(
+      `SELECT product_id, expires_at FROM Subscriptions WHERE license_key = ?`
+    ).bind(license_key).all();
+
+    const now = new Date();
+    const products = subs.map((sub: any) => {
+      let isExpired = false;
+      if (sub.expires_at) {
+        isExpired = new Date(sub.expires_at) < now;
+      }
+      return {
+        product_id: sub.product_id,
+        expires_at: sub.expires_at,
+        status: isExpired ? 'expired' : 'active'
+      };
+    });
+
+    // 如果没有任何有效订阅（虽然罕见），或者当前请求的特定 product_id 已明确过期，
+    // 也能在这做强拦截。但为保持通用性，我们统一返回所有 products，由插件判定具体权限。
+
     if (license.status === 'inactive') {
       // 首次激活，更新状态
       await c.env.DB.prepare(
-        `UPDATE Licenses SET status = 'active', activated_at = CURRENT_TIMESTAMP WHERE license_key = ? `
+        `UPDATE Licenses SET status = 'active', activated_at = CURRENT_TIMESTAMP WHERE license_key = ?`
       ).bind(license_key).run();
     }
 
     // 2. 查询设备绑定情况
     const { results: devices } = await c.env.DB.prepare(
-      `SELECT * FROM Devices WHERE license_key = ? `
+      `SELECT * FROM Devices WHERE license_key = ?`
     ).bind(license_key).all();
 
     const currentDevice = devices.find((d: any) => d.device_id === device_id);
@@ -74,31 +95,40 @@ app.post('/api/v1/auth/verify', async (c) => {
     if (currentDevice) {
       // 已经是老设备，更新最后活跃时间
       await c.env.DB.prepare(
-        `UPDATE Devices SET last_active = CURRENT_TIMESTAMP, device_name = ? WHERE license_key = ? AND device_id = ? `
+        `UPDATE Devices SET last_active = CURRENT_TIMESTAMP, device_name = ? WHERE license_key = ? AND device_id = ?`
       ).bind(device_name || currentDevice.device_name, license_key, device_id).run();
+    } else {
+      // 3. 拦截：如果是新设备且达到数量上限
+      if (devices.length >= license.max_devices) {
+        return c.json({ success: false, msg: `激活失败。该激活码最多绑定 ${license.max_devices} 台设备。请先解绑其他设备。` }, 403);
+      }
 
-      // 在生产环境中，此处应该下发 JWT。这里由于是 Phase 1，我们先返回简单的 Token 供插件校验。
-      return c.json({
-        success: true,
-        msg: '验证通过，设备已授权',
-        token: `jwt - mock - token - ${license_key.substring(0, 8)} `
-      });
+      // 4. 新设备绑定
+      await c.env.DB.prepare(
+        `INSERT INTO Devices(license_key, device_id, device_name) VALUES(?, ?, ?)`
+      ).bind(license_key, device_id, device_name || '未命名设备').run();
     }
 
-    // 3. 拦截：如果是新设备且达到数量上限
-    if (devices.length >= license.max_devices) {
-      return c.json({ success: false, msg: `激活失败。该激活码最多绑定 ${license.max_devices} 台设备。请先解绑其他设备。` }, 403);
-    }
-
-    // 4. 新设备绑定
-    await c.env.DB.prepare(
-      `INSERT INTO Devices(license_key, device_id, device_name) VALUES(?, ?, ?)`
-    ).bind(license_key, device_id, device_name || '未命名设备').run();
+    // --- 签发 JWT ---
+    // 为了防止“时光机漏洞”，我们将服务端的标准时间签入 JWT。
+    // 这里使用简单的 Base64 JSON 模拟 Token（实际项目中可替换为 `jsonwebtoken` 等库）。
+    // 将有效期设为 30 天，强制插件在此期间内必须联网刷一次 Token。
+    const expTime = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+    const tokenPayload = btoa(JSON.stringify({
+      license_key,
+      device_id,
+      exp: expTime,
+      server_time: new Date().toISOString()
+    }));
+    // 格式：header.payload.signature_mock
+    const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${tokenPayload}.mocksignature`;
 
     return c.json({
       success: true,
-      msg: '新设备绑定成功，系统已授权',
-      token: `jwt - mock - token - ${license_key.substring(0, 8)} `
+      msg: currentDevice ? '验证通过，设备已授权' : '新设备绑定成功，系统已授权',
+      token: mockToken,
+      products,  // 返回全部产品及其订阅状态
+      server_time: new Date().toISOString()  // 额外返回当前服务器时间供插件对齐
     });
 
   } catch (error: any) {
@@ -141,18 +171,35 @@ app.post('/api/v1/auth/admin/generate', async (c) => {
       return c.json({ success: false, msg: '无权访问：管理员密钥错误' }, 401);
     }
 
-    const { max_devices = 2, count = 1, product_id = 'default', user_name = '' } = await c.req.json().catch(() => ({}));
+    const { max_devices = 2, count = 1, product_id = 'default', user_name = '', duration_days } = await c.req.json().catch(() => ({}));
     const generatedKeys: string[] = [];
     const statements: D1PreparedStatement[] = [];
+
+    // 计算到期时间（如果有传入 duration_days）
+    let expiresAt: string | null = null;
+    if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
+      const date = new Date();
+      date.setDate(date.getDate() + duration_days);
+      expiresAt = date.toISOString();
+    }
 
     // 批量生成卡密并构建语句
     for (let i = 0; i < count; i++) {
       const newKey = generateLicenseKey(product_id || 'KEY');
       generatedKeys.push(newKey);
+
+      // 1. 插入 Licenses 表
       statements.push(
         c.env.DB.prepare(
           `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'active', ?)`
         ).bind(newKey, product_id, user_name, max_devices)
+      );
+
+      // 2. 插入对应的 Subscriptions 记录
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO Subscriptions(license_key, product_id, expires_at) VALUES(?, ?, ?)`
+        ).bind(newKey, product_id, expiresAt)
       );
     }
 
@@ -178,7 +225,7 @@ app.post('/api/v1/auth/admin/generate', async (c) => {
 app.get('/api/v1/auth/admin/licenses', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
+    const expectedSecret = c.env.ADMIN_SECRET;
     if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
@@ -186,9 +233,18 @@ app.get('/api/v1/auth/admin/licenses', async (c) => {
     // 支持按产品筛选，不传则查全部
     const productId = c.req.query('product_id');
 
-    // 联合查询出许可证本身，以及该证照当前绑定了多少设备
+    // 联合查询出许可证本身、绑定的设备数、以及该证照下的所有有效产品订阅（聚合为 JSON）
     let query = `
-      SELECT l.*, COUNT(d.id) as current_devices 
+      SELECT 
+        l.*, 
+        COUNT(DISTINCT d.id) as current_devices,
+        (
+          SELECT json_group_array(
+            json_object('product_id', s.product_id, 'expires_at', s.expires_at)
+          )
+          FROM Subscriptions s 
+          WHERE s.license_key = l.license_key
+        ) as subs_json
       FROM Licenses l
       LEFT JOIN Devices d ON l.license_key = d.license_key
     `;
@@ -203,7 +259,13 @@ app.get('/api/v1/auth/admin/licenses', async (c) => {
 
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
 
-    return c.json({ success: true, data: results });
+    // 将 subs_json 解析为真实数组返回给前端
+    const formattedResults = results.map((row: any) => ({
+      ...row,
+      subscriptions: row.subs_json ? JSON.parse(row.subs_json) : []
+    }));
+
+    return c.json({ success: true, data: formattedResults });
   } catch (error) {
     console.error(error);
     return c.json({ success: false, msg: '获取列表失败' }, 500);
@@ -214,7 +276,7 @@ app.get('/api/v1/auth/admin/licenses', async (c) => {
 app.post('/api/v1/auth/admin/licenses/status', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
+    const expectedSecret = c.env.ADMIN_SECRET;
     if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
@@ -242,7 +304,7 @@ app.post('/api/v1/auth/admin/licenses/status', async (c) => {
 app.post('/api/v1/auth/admin/licenses/user', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
+    const expectedSecret = c.env.ADMIN_SECRET;
     if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
@@ -270,7 +332,7 @@ app.post('/api/v1/auth/admin/licenses/user', async (c) => {
 app.delete('/api/v1/auth/admin/licenses', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    const expectedSecret = c.env.ADMIN_SECRET || "super-secret-admin-key-2026";
+    const expectedSecret = c.env.ADMIN_SECRET;
     if (authHeader !== `Bearer ${expectedSecret}`) {
       return c.json({ success: false, msg: '无权访问' }, 401);
     }
@@ -428,6 +490,10 @@ app.get('/admin', (c) => {
         <input type="number" id="genMaxDevices" value="2" min="1">
       </div>
       <div class="form-group">
+        <label>有效期 (天数)</label>
+        <input type="number" id="genDuration" placeholder="留空则永久有效，如 365">
+      </div>
+      <div class="form-group">
         <label>生成数量</label>
         <input type="number" id="genCount" value="1" min="1" max="100">
       </div>
@@ -505,19 +571,24 @@ app.get('/admin', (c) => {
     const userName = document.getElementById('genUserName').value;
     const count = document.getElementById('genCount').value;
     const maxDevices = document.getElementById('genMaxDevices').value;
+    const durationStr = document.getElementById('genDuration').value;
+    const durationDays = durationStr ? parseInt(durationStr) : null;
 
     btn.disabled = true; btn.innerText = "处理中...";
 
     try {
+      const payload = {
+        product_id: productId,
+        user_name: userName,
+        count: parseInt(count),
+        max_devices: parseInt(maxDevices)
+      };
+      if (durationDays) payload.duration_days = durationDays;
+
       const res = await fetch('/api/v1/auth/admin/generate', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_id: productId,
-          user_name: userName,
-          count: parseInt(count),
-          max_devices: parseInt(maxDevices)
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
@@ -541,37 +612,64 @@ app.get('/admin', (c) => {
       tbody.innerHTML = '';
       if (!data.success) {
         tbody.innerHTML = \`<tr><td colspan="6" style="color:var(--danger)">\${data.msg}</td></tr>\`; 
-                return; 
+        return; 
+      }
+
+      data.data.forEach(lic => {
+        const tr = document.createElement('tr');
+        const isRevoked = lic.status === 'revoked';
+        const statusBtnText = isRevoked ? '恢复' : '吊销';
+        const newStatus = isRevoked ? 'active' : 'revoked';
+        const userName = lic.user_name || '-';
+        const editNameArg = lic.user_name || '';
+
+        // 渲染订阅标签
+        let subsHtml = '';
+        if (lic.subscriptions && lic.subscriptions.length > 0) {
+          const now = new Date();
+          subsHtml = lic.subscriptions.map(s => {
+            if (!s.expires_at) {
+              return \`<span class="status-pill status-active" style="margin:2px; display:inline-block">\${s.product_id}: 永久</span>\`;
             }
+            const expDate = new Date(s.expires_at);
+            const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+            
+            if (daysLeft < 0) {
+              return \`<span class="status-pill status-revoked" style="margin:2px; display:inline-block">\${s.product_id}: 已过期</span>\`;
+            } else if (daysLeft <= 7) {
+              return \`<span class="status-pill status-inactive" style="margin:2px; display:inline-block">\${s.product_id}: 剩 \${daysLeft} 天</span>\`;
+            } else {
+              return \`<span class="status-pill status-active" style="margin:2px; display:inline-block">\${s.product_id}: 剩 \${daysLeft} 天</span>\`;
+            }
+          }).join('');
+        } else {
+          subsHtml = '<span style="color:#768390; font-size:12px;">无订阅</span>';
+        }
 
-            data.data.forEach(lic => {
-                const tr = document.createElement('tr');
-                const isRevoked = lic.status === 'revoked';
-                const statusBtnText = isRevoked ? '恢复' : '吊销';
-                const newStatus = isRevoked ? 'active' : 'revoked';
-                const userName = lic.user_name || '-';
-                const editNameArg = lic.user_name || '';
-
-                tr.innerHTML = \`
-                    <td style="font-family:monospace">\${lic.license_key}</td>
-                    <td>\${lic.product_id}</td>
-                    <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="color:var(--text-bright)">\${userName}</span>
-                            <button class="action-btn secondary" style="padding:2px 6px; font-size:10px;" onclick="editUserName('\${lic.license_key}', '\${editNameArg}')">改</button>
-                        </div>
-                    </td>
-                    <td>\${lic.current_devices} / \${lic.max_devices}</td>
-                    <td><span class="status-pill status-\${lic.status}">\${lic.status.toUpperCase()}</span></td>
-                    <td>
-                        <button class="action-btn secondary" onclick="toggleStatus('\${lic.license_key}', '\${newStatus}')">
-                            \${statusBtnText}
-                        </button>
-                        <button class="action-btn danger" onclick="deleteLic('\${lic.license_key}')">删除</button>
-                    </td>
-                \`;
-                tbody.appendChild(tr);
-            });
+        tr.innerHTML = \`
+            <td style="font-family:monospace">\${lic.license_key}</td>
+            <td>
+              <div style="margin-bottom: 5px;">\${lic.product_id}</div>
+              <div style="display:flex; flex-wrap:wrap; max-width: 200px;">\${subsHtml}</div>
+            </td>
+            <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:var(--text-bright)">\${userName}</span>
+                    <button class="action-btn secondary" style="padding:2px 6px; font-size:10px;" onclick="editUserName('\${lic.license_key}', '\${editNameArg}')">改</button>
+                </div>
+            </td>
+            <td>\${lic.current_devices} / \${lic.max_devices}</td>
+            <td><span class="status-pill status-\${lic.status}">\${lic.status.toUpperCase()}</span></td>
+            <td>
+                <button class="action-btn" style="background:#238636; color:white; border:none;" onclick="addSub('\${lic.license_key}')">+ 续费</button>
+                <button class="action-btn secondary" onclick="toggleStatus('\${lic.license_key}', '\${newStatus}')">
+                    \${statusBtnText}
+                </button>
+                <button class="action-btn danger" onclick="deleteLic('\${lic.license_key}')">删</button>
+            </td>
+        \`;
+        tbody.appendChild(tr);
+      });
         } catch (e) { tbody.innerHTML = '<tr><td colspan="6">网络错误</td></tr>'; }
     }
 
@@ -611,7 +709,31 @@ app.get('/admin', (c) => {
 
   function copyGenResult() {
     navigator.clipboard.writeText(document.getElementById('genOutput').innerText);
-    alert('已复制到剪贴板');
+    alert('已复制到剪贴板！');
+  }
+
+  async function addSub(key) {
+    const pId = prompt('请输入要添加或续费的产品 ID (例如: token-server):');
+    if (!pId) return;
+    
+    const daysStr = prompt('请输入有效期天数 (留空为永久，输入数字则在原到期日上累加密延期):');
+    const days = daysStr ? parseInt(daysStr) : null;
+
+    const payload = { license_key: key, product_id: pId };
+    if (days && !isNaN(days)) payload.duration_days = days;
+
+    const res = await fetch('/api/v1/auth/admin/subscriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('操作成功！新的到期日：' + (data.expires_at || '永久'));
+      loadLicenses();
+    } else {
+      alert('失败: ' + data.msg);
+    }
   }
 </script>
 
@@ -619,6 +741,91 @@ app.get('/admin', (c) => {
 </html>
   `;
   return c.html(html);
+});
+
+// ==========================================
+// API: (管理员) 一码多产品订阅管理 (Subscriptions)
+// ==========================================
+
+// 1. 添加/续费产品订阅 (Upsert 逻辑：若已有则时间累加，若无则新建)
+app.post('/api/v1/auth/admin/subscriptions', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader !== `Bearer ${c.env.ADMIN_SECRET}`) {
+      return c.json({ success: false, msg: '无权访问' }, 401);
+    }
+
+    const { license_key, product_id, duration_days } = await c.req.json();
+    if (!license_key || !product_id) {
+      return c.json({ success: false, msg: '缺少必备参数' }, 400);
+    }
+
+    // 查询该卡密是否已存在此产品的订阅
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM Subscriptions WHERE license_key = ? AND product_id = ?`
+    ).bind(license_key, product_id).all();
+
+    let newExpiresAt: string | null = null;
+    const now = new Date();
+
+    if (duration_days && typeof duration_days === 'number') {
+      if (results.length > 0 && results[0].expires_at) {
+        // 已有记录且非永久：在其原到期日和今天之间取较大者，再累加天数 (无缝续费)
+        const currentExp = new Date(results[0].expires_at as string);
+        const baseDate = currentExp > now ? currentExp : now;
+        baseDate.setDate(baseDate.getDate() + duration_days);
+        newExpiresAt = baseDate.toISOString();
+      } else if (results.length > 0 && !results[0].expires_at) {
+        // 已经是永久买断了，无需续费
+        return c.json({ success: false, msg: '该产品已经是永久有效，无需续费' }, 400);
+      } else {
+        // 全新订阅
+        now.setDate(now.getDate() + duration_days);
+        newExpiresAt = now.toISOString();
+      }
+    }
+
+    if (results.length > 0) {
+      // 执行 UPDATE (续期)
+      await c.env.DB.prepare(
+        `UPDATE Subscriptions SET expires_at = ? WHERE license_key = ? AND product_id = ?`
+      ).bind(newExpiresAt, license_key, product_id).run();
+    } else {
+      // 执行 INSERT (新增)
+      await c.env.DB.prepare(
+        `INSERT INTO Subscriptions(license_key, product_id, expires_at) VALUES(?, ?, ?)`
+      ).bind(license_key, product_id, newExpiresAt).run();
+    }
+
+    return c.json({ success: true, msg: '产品订阅已成功更新', expires_at: newExpiresAt });
+  } catch (error) {
+    console.error(error);
+    return c.json({ success: false, msg: '订阅管理遇到错误' }, 500);
+  }
+});
+
+// 2. 移除指定产品的订阅
+app.delete('/api/v1/auth/admin/subscriptions', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader !== `Bearer ${c.env.ADMIN_SECRET}`) {
+      return c.json({ success: false, msg: '无权访问' }, 401);
+    }
+
+    const { license_key, product_id } = await c.req.json();
+    const result = await c.env.DB.prepare(
+      `DELETE FROM Subscriptions WHERE license_key = ? AND product_id = ?`
+    ).bind(license_key, product_id).run();
+
+    if (result.meta.changes > 0) {
+      return c.json({ success: true, msg: '产品订阅已移除' });
+    } else {
+      return c.json({ success: false, msg: '未找到该产品的订阅记录' }, 404);
+    }
+  } catch (error) {
+    console.error(error);
+    return c.json({ success: false, msg: '移除订阅失败' }, 500);
+  }
 });
 
 export default app;

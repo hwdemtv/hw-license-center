@@ -18,9 +18,9 @@ ADMIN_SECRET = "super-secret-admin-key-2026"
 
 # 自定义域名路由（部署时自动同步到 Cloudflare）
 [[routes]]
-pattern = "km.hwdemtv.com/*"
+pattern = "km.hwdemtv.com"
 custom_domain = true
 
 [[routes]]
-pattern = "kami.hwdemtv.com/*"
+pattern = "kami.hwdemtv.com"
 custom_domain = true
