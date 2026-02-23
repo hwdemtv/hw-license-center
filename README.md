@@ -82,5 +82,44 @@ npx wrangler deploy src/index.ts
 
 ---
 
+## 🔗 域名访问
+
+| 地址 | 用途 |
+|---|---|
+| `https://hw-license-center.hwdemtv.workers.dev` | Cloudflare Workers 原始地址 |
+| `https://km.hwdemtv.com` | 自定义域名（Cloudflare 托管） |
+| `https://kami.hwdemtv.com` | 备用自定义域名 |
+
+管理后台入口：在上述任意地址后加 `/admin`
+
+---
+
+## 📍 认证地址配置速查
+
+如需更换服务域名，需要同步修改以下位置：
+
+### 服务端 (hw-license-center)
+
+| 文件 | 行号 | 说明 |
+|---|---|---|
+| `wrangler.toml` | L16-17 | `ADMIN_SECRET` 管理员密钥 |
+| `src/index.ts` | L127 | 管理员密钥回退默认值 |
+
+### 插件端 (smart-mp)
+
+| 文件 | 行号 | 说明 |
+|---|---|---|
+| `src/services/auth-service.ts` | L10 | `AUTH_API_URL` 认证接口基地址 |
+
+当前值：
+```typescript
+// smart-mp/src/services/auth-service.ts:10
+private readonly AUTH_API_URL = "https://km.hwdemtv.com/api/v1/auth";
+```
+
+> ⚠️ 修改域名后，需要同时更新 Cloudflare Worker 的自定义域名配置（Workers 设置 → 域和路由）。
+
+---
+
 ## ⚖️ 开源协议
 MIT
