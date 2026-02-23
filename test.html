@@ -1,0 +1,300 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartMP Auth - 开发者控制台</title>
+    <style>
+        :root {
+            --bg-color: #0b0d11;
+            --panel-bg: #15191e;
+            --border-color: #2d333b;
+            --text-main: #adbac7;
+            --text-bright: #cdd9e5;
+            --accent: #5385ff;
+            --accent-glow: rgba(83, 133, 255, 0.3);
+            --success: #57ab5a;
+            --warning: #c69026;
+            --danger: #e5534b;
+            --active-bg: #1c2128;
+        }
+        body {
+            margin: 0; font-family: -apple-system, system-ui, sans-serif;
+            background: var(--bg-color); color: var(--text-main); line-height: 1.5;
+        }
+        .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .header h1 { font-size: 24px; color: var(--text-bright); margin: 0; }
+        
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+        .tab { 
+            padding: 10px 20px; cursor: pointer; border-radius: 6px 6px 0 0; 
+            border: 1px solid transparent; margin-bottom: -1px; transition: 0.2s;
+        }
+        .tab:hover { color: var(--text-bright); background: var(--active-bg); }
+        .tab.active { 
+            background: var(--panel-bg); color: var(--accent);
+            border: 1px solid var(--border-color); border-bottom-color: var(--panel-bg);
+            font-weight: 600;
+        }
+
+        .section { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 30px; display: none; }
+        .section.active { display: block; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 13px; margin-bottom: 8px; color: var(--text-muted); }
+        input, select { 
+            width: 100%; padding: 12px; background: #010409; border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-bright); outline: none; box-sizing: border-box;
+        }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        
+        .row { display: flex; gap: 15px; }
+        .row > * { flex: 1; }
+
+        button { 
+            background: var(--accent); color: white; border: none; padding: 12px 24px; 
+            border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.secondary { background: #373e47; color: var(--text-bright); }
+        button.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; font-size: 12px; }
+        button.danger:hover { background: var(--danger); color: white; }
+        button.action-btn { padding: 6px 12px; font-size: 12px; margin-right: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th { text-align: left; padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-bright); }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        tr:hover { background: rgba(255,255,255,0.02); }
+
+        .status-pill { padding: 4px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .status-active { background: rgba(87,171,90,0.15); color: var(--success); }
+        .status-revoked { background: rgba(229,83,75,0.15); color: var(--danger); }
+        .status-inactive { background: rgba(198,144,38,0.15); color: var(--warning); }
+
+        .result-panel { margin-top: 25px; padding: 20px; background: #010409; border-radius: 8px; position: relative; }
+        .code-area { font-family: monospace; white-space: pre-wrap; font-size: 13px; color: var(--success); }
+        
+        #adminAuth { position: fixed; inset: 0; background: var(--bg-color); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .login-box { width: 320px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="adminAuth">
+    <div class="login-box">
+        <h2 style="color: var(--text-bright)">身份验证</h2>
+        <div class="form-group">
+            <input type="password" id="globalSecret" placeholder="输入管理员密钥" value="super-secret-admin-key-2026">
+        </div>
+        <button onclick="login()">进入控制台</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><circle cx="12" cy="12" r="10"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+        <h1>SmartMP Auth Center</h1>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('generate')">🔥 极速生卡</div>
+        <div class="tab" onclick="switchTab('manage')">📊 卡密管理</div>
+    </div>
+
+    <!-- Tab: Generate -->
+    <div id="sec-generate" class="section active">
+        <div class="row">
+            <div class="form-group">
+                <label>产品线标识 (Product ID)</label>
+                <input type="text" id="genProductId" value="smartmp" placeholder="例如: smartmp">
+            </div>
+            <div class="form-group">
+                <label>绑定用户名/备注</label>
+                <input type="text" id="genUserName" placeholder="例如: 客户微信名、订单号">
+            </div>
+        </div>
+        <div class="row">
+            <div class="form-group">
+                <label>单码设备配额</label>
+                <input type="number" id="genMaxDevices" value="2" min="1">
+            </div>
+            <div class="form-group">
+                <label>生成数量</label>
+                <input type="number" id="genCount" value="1" min="1" max="100">
+            </div>
+        </div>
+        <button id="btnDoGen" onclick="doGenerate()">✦ 立即自动制卡</button>
+
+        <div id="genResult" class="result-panel" style="display:none">
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">生成成功，请妥善保存：</div>
+            <div id="genOutput" class="code-area"></div>
+            <button class="secondary" style="margin-top:15px; width:100%" onclick="copyGenResult()">复制全部卡密</button>
+        </div>
+    </div>
+
+    <!-- Tab: Manage -->
+    <div id="sec-manage" class="section">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;">
+            <div style="flex:1; max-width:300px;">
+                <label>筛选产品</label>
+                <input type="text" id="filterProductId" placeholder="输入 ID 筛选，留空查所有" oninput="loadLicenses()">
+            </div>
+            <button class="secondary" onclick="loadLicenses()">刷新列表</button>
+        </div>
+
+        <table id="licTable">
+            <thead>
+                <tr>
+                    <th>激活码 (Key)</th>
+                    <th>产品 ID</th>
+                    <th>用户备注</th>
+                    <th>设备 (用/总)</th>
+                    <th>状态</th>
+                    <th>管理</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let ADMIN_SECRET = "";
+
+    function login() {
+        const secret = document.getElementById('globalSecret').value;
+        if (!secret) return;
+        ADMIN_SECRET = secret;
+        document.getElementById('adminAuth').style.display = 'none';
+        loadLicenses();
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('sec-' + tab).classList.add('active');
+        if (tab === 'manage') loadLicenses();
+    }
+
+    async function doGenerate() {
+        const btn = document.getElementById('btnDoGen');
+        const productId = document.getElementById('genProductId').value;
+        const userName = document.getElementById('genUserName').value;
+        const count = document.getElementById('genCount').value;
+        const maxDevices = document.getElementById('genMaxDevices').value;
+
+        btn.disabled = true; btn.innerText = "处理中...";
+        
+        try {
+            const res = await fetch('/api/v1/auth/admin/generate', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    product_id: productId, 
+                    user_name: userName,
+                    count: parseInt(count), 
+                    max_devices: parseInt(maxDevices) 
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('genResult').style.display = 'block';
+                document.getElementById('genOutput').innerText = data.keys.join('\n');
+            } else { alert(data.msg); }
+        } catch (e) { alert("生成失败: " + e.message); }
+        finally { btn.disabled = false; btn.innerText = "✦ 立即自动制卡"; }
+    }
+
+    async function loadLicenses() {
+        const filter = document.getElementById('filterProductId').value;
+        const tbody = document.querySelector('#licTable tbody');
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">正在加载数据流...</td></tr>';
+
+        try {
+            const res = await fetch('/api/v1/auth/admin/licenses?product_id=' + filter, {
+                headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+            });
+            const data = await res.json();
+            tbody.innerHTML = '';
+            if (!data.success) { 
+                tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger)">${data.msg}</td></tr>`; 
+                return; 
+            }
+
+            data.data.forEach(lic => {
+                const tr = document.createElement('tr');
+                const isRevoked = lic.status === 'revoked';
+                const statusBtnText = isRevoked ? '恢复' : '吊销';
+                const newStatus = isRevoked ? 'active' : 'revoked';
+                const userName = lic.user_name || '-';
+                const editNameArg = lic.user_name || '';
+
+                tr.innerHTML = `
+                    <td style="font-family:monospace">${lic.license_key}</td>
+                    <td>${lic.product_id}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="color:var(--text-bright)">${userName}</span>
+                            <button class="action-btn secondary" style="padding:2px 6px; font-size:10px;" onclick="editUserName('${lic.license_key}', '${editNameArg}')">改</button>
+                        </div>
+                    </td>
+                    <td>${lic.current_devices} / ${lic.max_devices}</td>
+                    <td><span class="status-pill status-${lic.status}">${lic.status.toUpperCase()}</span></td>
+                    <td>
+                        <button class="action-btn secondary" onclick="toggleStatus('${lic.license_key}', '${newStatus}')">
+                            ${statusBtnText}
+                        </button>
+                        <button class="action-btn danger" onclick="deleteLic('${lic.license_key}')">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) { tbody.innerHTML = '<tr><td colspan="6">网络错误</td></tr>'; }
+    }
+
+    async function toggleStatus(key, status) {
+        if (!confirm('确定要将 [' + key + '] 的状态更改为 ' + status + ' 吗？')) return;
+        const res = await fetch('/api/v1/auth/admin/licenses/status', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: key, status })
+        });
+        const data = await res.json();
+        if (data.success) loadLicenses(); else alert(data.msg);
+    }
+
+    async function deleteLic(key) {
+        if (!confirm('⚠️ 高危操作：确定要彻底删除卡密 [' + key + '] 吗？\n这将同时清除所有已绑定的机器，且不可恢复！')) return;
+        const res = await fetch('/api/v1/auth/admin/licenses', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: key })
+        });
+        const data = await res.json();
+        if (data.success) loadLicenses(); else alert(data.msg);
+    }
+
+    async function editUserName(key, currentName) {
+        const newName = prompt('修改激活码 [' + key + '] 的备注信息：', currentName);
+        if (newName === null) return;
+        const res = await fetch('/api/v1/auth/admin/licenses/user', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: key, user_name: newName })
+        });
+        const data = await res.json();
+        if (data.success) loadLicenses(); else alert(data.msg);
+    }
+
+    function copyGenResult() {
+        navigator.clipboard.writeText(document.getElementById('genOutput').innerText);
+        alert('已复制到剪贴板');
+    }
+</script>
+
+</body>
+</html>
+  

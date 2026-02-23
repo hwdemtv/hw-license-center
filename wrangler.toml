@@ -1,0 +1,17 @@
+name = "hw-license-center"
+main = "src/index.ts"
+compatibility_date = "2025-02-14"
+
+# Node.js compatibility for machine-id etc if needed
+compatibility_flags = [ "nodejs_compat" ]
+
+# Bindings for D1 Database
+[[d1_databases]]
+binding = "DB" # Available in your code as env.DB
+database_name = "smart-mp-db"
+database_id = "beb9e90a-93b0-480e-aa84-c4d958052006" # Keep the existing ID unless resetting DB
+
+# Variables
+[vars]
+# WARNING: you should probably set this via wrangler secret put ADMIN_SECRET instead
+ADMIN_SECRET = "super-secret-admin-key-2026"
