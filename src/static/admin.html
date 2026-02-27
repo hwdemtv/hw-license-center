@@ -820,7 +820,7 @@
       </div>
 
       <!--阶段一二过渡：暂时保留 table 容器名，以便 JS 还能填充数据，下一阶段将彻底改为网格卡片-->
-      <div id="licListContainer">
+      <div id="licListContainer" style="padding-bottom: 90px;">
         <div class="table-container">
           <table id="licTable">
             <thead>
@@ -1112,6 +1112,8 @@
       document.getElementById('sec-' + tab).classList.add('active');
       if (tab === 'manage') loadLicenses();
       if (tab === 'settings') loadSettings();
+      // 在标签切换时同步更新底栏可见性，防全局遮挡
+      if (typeof updateBatchBar === 'function') updateBatchBar();
     }
 
     let currentPagination = null;
@@ -1948,9 +1950,16 @@
       const bar = document.getElementById('batchBar');
       const countDisplay = document.getElementById('batchCountDisplay');
       if (!bar || !countDisplay) return;
+
+      // 判断是否在“资产管理”标签页 (`sec-manage`)
+      const manageSection = document.getElementById('sec-manage');
+      const isManageTabActive = manageSection && manageSection.classList.contains('active');
+
       const count = SET_SELECTED_KEYS.size;
       countDisplay.innerText = count + ' 项选中';
-      if (count > 0) {
+
+      // 只有在资产列表且选中项 > 0 时才弹出
+      if (count > 0 && isManageTabActive) {
         bar.classList.add('active');
       } else {
         bar.classList.remove('active');
