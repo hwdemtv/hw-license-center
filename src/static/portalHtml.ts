@@ -276,6 +276,25 @@ export const portalHtml = `
             display: flex;
             gap: 12px;
         }
+        .rule-tips {
+            margin-top: 24px;
+            padding: 16px;
+            background: rgba(88, 166, 255, 0.05);
+            border: 1px solid rgba(88, 166, 255, 0.1);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-main);
+            line-height: 1.8;
+        }
+
+        .rule-tips-title {
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
     </style>
 </head>
 
