@@ -57,18 +57,87 @@ app.post('/generate', async (c) => {
   }
 });
 
-// API: (管理员) 获取卡密列表与绑定状态
+
+
+// API: (管理员) 服务端分页专用查询接口 (Phase 11.5)
 app.get('/licenses', async (c) => {
   try {
+    const page = parseInt(c.req.query('page') || '1') || 1;
+    const limit = parseInt(c.req.query('limit') || '20') || 20;
+    const search = (c.req.query('search') || '').trim();
+    const productId = c.req.query('product_id') || '';
+    const status = c.req.query('status') || 'all';
+    const sort = c.req.query('sort') || 'created_desc';
 
-    // 支持按产品筛选，不传则查全部
-    const productId = c.req.query('product_id');
+    const offset = (page - 1) * limit;
 
-    // 联合查询出许可证本身、绑定的设备数、以及该证照下的所有有效产品订阅（聚合为 JSON）
-    let query = `
+    // 1. 构建基础 WHERE 条件
+    let whereClauses: string[] = ['1=1'];
+    let params: any[] = [];
+
+    if (productId) {
+      whereClauses.push('l.product_id = ?');
+      params.push(productId);
+    }
+
+    if (search) {
+      whereClauses.push('(l.license_key LIKE ? OR l.user_name LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // 状态过滤 (复刻原有前端逻辑)
+    if (status === 'active') {
+      whereClauses.push('l.status = ?');
+      params.push('active');
+    } else if (status === 'revoked') {
+      whereClauses.push('l.status = ?');
+      params.push('revoked');
+    } else if (status === 'expiring') {
+      // 临期判定：关联 Subscriptions 查找7天内过期的
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s 
+          WHERE s.license_key = l.license_key 
+            AND s.expires_at IS NOT NULL 
+            AND datetime(s.expires_at) > datetime('now')
+            AND datetime(s.expires_at) <= datetime('now', '+7 days')
+        )
+      `);
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    // 2. 聚合统计看板快照 (全局，忽略当前分页但是带WHERE过滤)
+    // 但为了不改变用户预期，看板统计通常需要基于无检索状态下的全局快照。
+    // 这里我们返回一个经过筛选的 total 数，以及全局无检索状态下的四个看板数
+    const statsQuery = `
+      SELECT 
+        (SELECT COUNT(*) FROM Licenses) as global_total,
+        (SELECT COUNT(*) FROM Licenses WHERE status = 'active') as global_active,
+        (SELECT COUNT(*) FROM Licenses WHERE status = 'revoked') as global_revoked,
+        (SELECT COUNT(DISTINCT l.license_key) FROM Licenses l 
+         INNER JOIN Subscriptions s ON l.license_key = s.license_key 
+         WHERE s.expires_at IS NOT NULL 
+           AND datetime(s.expires_at) > datetime('now') 
+           AND datetime(s.expires_at) <= datetime('now', '+7 days')
+        ) as global_expiring,
+        (SELECT COUNT(*) FROM Licenses l WHERE ${whereSql}) as current_filter_total
+    `;
+
+    // 执行看板统计和当前过滤条件下的总数查询
+    const statsResult = await c.env.DB.prepare(statsQuery).bind(...params).first();
+    const filterTotal = (statsResult?.current_filter_total as number) || 0;
+
+    // 3. 构建排序规则
+    let orderSql = 'ORDER BY l.created_at DESC';
+    if (sort === 'created_asc') orderSql = 'ORDER BY l.created_at ASC';
+    else if (sort === 'devices_desc') orderSql = 'ORDER BY current_devices DESC';
+
+    // 4. 拉取当前页数据
+    const dataQuery = `
       SELECT 
         l.*, 
-        COUNT(DISTINCT d.id) as current_devices,
+        (SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) as current_devices,
         (
           SELECT json_group_array(
             json_object('product_id', s.product_id, 'expires_at', s.expires_at)
@@ -77,29 +146,39 @@ app.get('/licenses', async (c) => {
           WHERE s.license_key = l.license_key
         ) as subs_json
       FROM Licenses l
-      LEFT JOIN Devices d ON l.license_key = d.license_key
+      WHERE ${whereSql}
+      ${orderSql}
+      LIMIT ? OFFSET ?
     `;
-    const params: string[] = [];
 
-    if (productId) {
-      query += ` WHERE l.product_id = ?`;
-      params.push(productId);
-    }
+    // params 后面追加 limit 和 offset
+    const { results } = await c.env.DB.prepare(dataQuery).bind(...params, limit, offset).all();
 
-    query += ` GROUP BY l.license_key ORDER BY l.created_at DESC`;
-
-    const { results } = await c.env.DB.prepare(query).bind(...params).all();
-
-    // 将 subs_json 解析为真实数组返回给前端
     const formattedResults = results.map((row: any) => ({
       ...row,
       subscriptions: row.subs_json ? JSON.parse(row.subs_json) : []
     }));
 
-    return c.json({ success: true, data: formattedResults });
+    return c.json({
+      success: true,
+      data: formattedResults,
+      pagination: {
+        total: filterTotal,
+        current_page: page,
+        limit: limit,
+        total_pages: Math.ceil(filterTotal / limit)
+      },
+      stats: {
+        total: statsResult?.global_total || 0,
+        active: statsResult?.global_active || 0,
+        revoked: statsResult?.global_revoked || 0,
+        expiring: statsResult?.global_expiring || 0
+      }
+    });
+
   } catch (error) {
-    console.error(error);
-    return c.json({ success: false, msg: '获取列表失败' }, 500);
+    console.error('Paged API Error:', error);
+    return c.json({ success: false, msg: '获取分页数据失败' }, 500);
   }
 });
 

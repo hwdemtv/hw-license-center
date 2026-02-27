@@ -931,28 +931,16 @@
       if (tab === 'manage') loadLicenses();
     }
 
-    // 计算并更新顶部统计指标（零动画版本）
-    function updateStats() {
-      const total = ALL_LICENSES.length;
-      const active = ALL_LICENSES.filter(l => l.status === 'active').length;
-      const revoked = ALL_LICENSES.filter(l => l.status === 'revoked').length;
+    let currentPagination = null;
+    let currentStats = null;
 
-      // 临期订阅 (7天内过期)
-      const now = new Date();
-      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-      const expiring = ALL_LICENSES.filter(l => {
-        if (!l.subscriptions) return false;
-        return l.subscriptions.some(s => {
-          if (!s.expires_at) return false;
-          const diff = new Date(s.expires_at) - now;
-          return diff > 0 && diff <= SEVEN_DAYS;
-        });
-      });
-
-      document.getElementById('stat-total').innerText = total;
-      document.getElementById('stat-active').innerText = active;
-      document.getElementById('stat-revoked').innerText = revoked;
-      document.getElementById('stat-expiring').innerText = expiring.length;
+    // 计算并更新顶部统计指标
+    function updateStats(stats) {
+      if (!stats) return;
+      document.getElementById('stat-total').innerText = stats.total;
+      document.getElementById('stat-active').innerText = stats.active;
+      document.getElementById('stat-revoked').innerText = stats.revoked;
+      document.getElementById('stat-expiring').innerText = stats.expiring;
 
       // 为临期看板绑定点击筛选能力 (仅绑定一次防重复)
       const expCard = document.getElementById('stat-expiring').parentElement;
@@ -1050,17 +1038,36 @@
       }
     });
 
-    // 接口加载数据
+    // 后端游标加载数据
     async function loadLicenses() {
-      const pId = document.getElementById('filterProductId').value;
+      const searchKw = document.getElementById('keywordSearch') ? document.getElementById('keywordSearch').value.trim() : '';
+      const pId = document.getElementById('filterProductId') ? document.getElementById('filterProductId').value : '';
       const container = document.getElementById('licListContainer');
-      container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">🚀 正在同步边缘数据...</div>';
+
+      const queryParams = new URLSearchParams({
+        page: currentPage,
+        limit: PAGE_SIZE,
+        search: searchKw,
+        product_id: pId,
+        status: currentStatusFilter,
+        sort: currentSort
+      });
+
+      // 零状态时给大占位符，有数据增量时使用轻微透明度保护乐观UI
+      if (!document.querySelector('.lic-row')) {
+        container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">🚀 正在同步边缘数据...</div>';
+      } else {
+        container.style.opacity = '0.6';
+      }
 
       try {
-        const res = await fetch('/api/v1/auth/admin/licenses?product_id=' + pId, {
+        const res = await fetch('/api/v1/auth/admin/licenses?' + queryParams.toString(), {
           headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
         });
         const data = await res.json();
+
+        container.style.opacity = '1';
+
         if (!data.success) {
           if (res.status === 401) {
             logout();
@@ -1071,29 +1078,42 @@
           return;
         }
 
-        ALL_LICENSES = data.data;
-        currentPage = 1; // 重新拉取后重置为第一页
-        updateStats();
+        ALL_LICENSES = data.data; // 降级为仅缓存当前页数组，用于热变更映射
+        currentPagination = data.pagination;
+        currentStats = data.stats;
+
+        updateStats(currentStats);
         updateProductHelpers();
-        renderCards(ALL_LICENSES);
+        renderCards(ALL_LICENSES, currentPagination);
       } catch (e) {
+        container.style.opacity = '1';
         container.innerHTML = '<div style="padding:20px; color:var(--danger)">⚠️ 无法连接服务器</div>';
       }
     }
 
+    // 乐观 UI 内部静默热渲染器，不引发闪烁与网络波动
+    function reRenderCards() {
+      renderCards(ALL_LICENSES, currentPagination);
+    }
+
     // 渲染列表视图布局
-    function renderCards(list) {
+    function renderCards(list, pagination = null) {
       const container = document.getElementById('licListContainer');
       if (list.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">📭 暂无相关卡密数据</div>';
+        const topPag = document.getElementById('topPagination');
+        if (topPag) topPag.innerHTML = '';
         return;
       }
 
-      // 获取所有经过过滤后的卡密 ID，以便全选使用
-      const currentFilteredKeys = list.map(l => l.license_key);
+      // 所有的 list 即为已从后端切片好的 pagedList
+      const pagedList = list;
 
-      // 检查是否在当前列表和集合中全选了
-      const isAllChecked = list.length > 0 && list.every(l => SET_SELECTED_KEYS.has(l.license_key));
+      // 获取所有当前页的卡密 ID，以便全选比较使用
+      const currentFilteredKeys = pagedList.map(l => l.license_key);
+
+      // 检查是否在当前列表和跨页集合中全选了
+      const isAllChecked = pagedList.length > 0 && pagedList.every(l => SET_SELECTED_KEYS.has(l.license_key));
 
       let html = '<div class="lic-list">';
       html += `
@@ -1108,16 +1128,11 @@
 
       const now = new Date();
 
-      // 分页计算
-      const totalItems = list.length;
-      const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
-      // 防御性纠正
+      // 同步分页元数据为组件作用域变量
+      const totalPages = pagination ? pagination.total_pages : 1;
+      const totalItems = pagination ? pagination.total : list.length;
       if (currentPage > totalPages) currentPage = totalPages;
       if (currentPage < 1) currentPage = 1;
-
-      const startIndex = (currentPage - 1) * PAGE_SIZE;
-      const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
-      const pagedList = list.slice(startIndex, endIndex);
 
       pagedList.forEach((lic) => {
         // 准备订阅状态 HTML
@@ -1289,43 +1304,8 @@
 
     // 搜索过滤与多维排序核心
     function filterLocalList(resetPage = true) {
-      const kw = document.getElementById('keywordSearch').value.toLowerCase();
-      const pId = document.getElementById('filterProductId').value;
-
-      let filtered = ALL_LICENSES.filter(l => {
-        const matchKeyword = !kw ||
-          l.license_key.toLowerCase().includes(kw) ||
-          (l.user_name && l.user_name.toLowerCase().includes(kw));
-
-        const matchProduct = !pId || l.product_id === pId;
-
-        let matchStatus = true;
-        if (currentStatusFilter === 'active') matchStatus = l.status === 'active';
-        else if (currentStatusFilter === 'revoked') matchStatus = l.status === 'revoked';
-        else if (currentStatusFilter === 'expiring') {
-          // 临期判定
-          const now = new Date();
-          const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-          matchStatus = !!(l.subscriptions && l.subscriptions.some(s => {
-            if (!s.expires_at) return false;
-            const diff = new Date(s.expires_at) - now;
-            return diff > 0 && diff <= SEVEN_DAYS;
-          }));
-        }
-
-        return matchKeyword && matchProduct && matchStatus;
-      });
-
-      // 排序
-      filtered.sort((a, b) => {
-        if (currentSort === 'created_desc') return new Date(b.created_at) - new Date(a.created_at);
-        if (currentSort === 'created_asc') return new Date(a.created_at) - new Date(b.created_at);
-        if (currentSort === 'devices_desc') return b.current_devices - a.current_devices;
-        return 0;
-      });
-
       if (resetPage) currentPage = 1;
-      renderCards(filtered);
+      loadLicenses(); // 所有排序与过滤计算引擎下沉至后端
     }
 
     // 生卡逻辑
@@ -1395,8 +1375,12 @@
           const lic = ALL_LICENSES.find(l => l.license_key === key);
           if (lic) {
             lic.status = status;
-            updateStats();
-            filterLocalList(false); // 局部热更新
+            if (currentStats) {
+              if (status === 'active') { currentStats.active++; currentStats.revoked--; }
+              else { currentStats.active--; currentStats.revoked++; }
+            }
+            updateStats(currentStats);
+            reRenderCards(); // 高效静态重绘
           }
           showToast(data.msg || '状态已更新', 'success');
         } else {
@@ -1427,8 +1411,15 @@
           ALL_LICENSES = ALL_LICENSES.filter(l => l.license_key !== key);
           SET_SELECTED_KEYS.delete(key);
           updateBatchBar();
-          updateStats();
-          filterLocalList(false); // 局部热更新
+
+          if (currentStats && currentStats.total > 0) currentStats.total--;
+          updateStats(currentStats);
+
+          // 如果当前页被删空，且不是第一页，自动退一页拉取
+          if (ALL_LICENSES.length === 0 && currentPage > 1) {
+            currentPage--;
+          }
+          filterLocalList(false); // 物理删除必须让后端填补空位
           showToast('已彻底删除该卡密', 'success');
         } else {
           showToast(data.msg || '删除失败', 'error');
@@ -1458,7 +1449,7 @@
           const lic = ALL_LICENSES.find(l => l.license_key === key);
           if (lic) {
             lic.user_name = n;
-            filterLocalList(false); // 局部热更新
+            reRenderCards(); // 文本热变更，零闪烁
           }
           showToast('备注已更新', 'success');
         } else {
