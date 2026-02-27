@@ -11,18 +11,12 @@ import { adminHtml } from './static/adminHtml';
 import { portalHtml } from './static/portalHtml';
 
 import { DBAdapter } from './db/adapter';
+import { trimTrailingSlash } from 'hono/trailing-slash';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env }>({ strict: false });
 
-// 全局 URL 纠错防误输拦截器：将多余的双斜杠和尾斜杠 301 重定向到标准路径
-app.use('*', async (c, next) => {
-  const path = c.req.path;
-  if (path.length > 1 && (path.includes('//') || path.endsWith('/'))) {
-    const newPath = path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
-    return c.redirect(newPath, 301);
-  }
-  await next();
-});
+// 移除末尾多余斜杠
+app.use('*', trimTrailingSlash());
 
 // 核心同构钩子：拦截并在下文执行前将原生 DB 对象使用 DBAdapter 包裹包装。
 // 若环境为 Cloudflare Workers，则代理调用；若为原生 Node.js，则在此注入本地 SQLite 实例，平层替换 c.env.DB。
