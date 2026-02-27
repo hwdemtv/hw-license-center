@@ -12,6 +12,14 @@ app.post('/verify', async (c) => {
       return c.json({ success: false, msg: '缺少激活码或设备标识' }, 400);
     }
 
+    // 防御性拦截：保护核心检索字段不超长，防止恶意攻击查库
+    if (String(license_key).length > 128 || String(device_id).length > 128) {
+      return c.json({ success: false, msg: '验证失败：核心参数长度超限' }, 400);
+    }
+
+    // 防御性温和截断：对非检索展示字段仅截取有效部分，兼容各种旧版客户端
+    const safeDeviceName = device_name ? String(device_name).substring(0, 128) : '未命名设备';
+
     // 1. 查询激活码是否有效（不再限制必须与请求产品的初始所属权一致，实现“一卡跑全产品”跨界）
     const { results: licenses } = await c.env.DB.prepare(
       `SELECT * FROM Licenses WHERE license_key = ? `
@@ -66,7 +74,7 @@ app.post('/verify', async (c) => {
       // 已经是老设备，更新最后活跃时间
       await c.env.DB.prepare(
         `UPDATE Devices SET last_active = CURRENT_TIMESTAMP, device_name = ? WHERE license_key = ? AND device_id = ?`
-      ).bind(device_name || currentDevice.device_name, license_key, device_id).run();
+      ).bind(device_name ? safeDeviceName : currentDevice.device_name, license_key, device_id).run();
     } else {
       // 3. 拦截：如果是新设备且达到数量上限
       if (devices.length >= license.max_devices) {
@@ -76,7 +84,7 @@ app.post('/verify', async (c) => {
       // 4. 新设备绑定
       await c.env.DB.prepare(
         `INSERT INTO Devices(license_key, device_id, device_name) VALUES(?, ?, ?)`
-      ).bind(license_key, device_id, device_name || '未命名设备').run();
+      ).bind(license_key, device_id, safeDeviceName).run();
     }
 
     // --- 签发 JWT ---
@@ -119,6 +127,10 @@ app.post('/unbind', async (c) => {
 
     if (!license_key || !device_id) {
       return c.json({ success: false, msg: '缺少参数' }, 400);
+    }
+
+    if (String(license_key).length > 128 || String(device_id).length > 128) {
+      return c.json({ success: false, msg: '参数长度超限' }, 400);
     }
 
     const result = await c.env.DB.prepare(

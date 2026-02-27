@@ -186,10 +186,17 @@ app.post('/licenses/import', async (c) => {
       return c.json({ success: false, msg: '数据格式错误，期望一个包含 licenses 数组的 JSON' }, 400);
     }
 
+    // 防御：单次导入数量限制
+    if (licenses.length > 2000) {
+      return c.json({ success: false, msg: '单次导入不得超过 2000 条数据，防止资源耗尽' }, 400);
+    }
+
     const statements: any[] = []; // D1PreparedStatement
 
     for (const lic of licenses) {
       if (!lic.license_key) continue;
+      // 超长卡密跳过，防撑爆
+      if (String(lic.license_key).length > 100) continue;
 
       // 1. Upsert 到 Licenses 表 (使用 INSERT OR REPLACE)
       statements.push(
@@ -256,6 +263,11 @@ app.post('/subscriptions', async (c) => {
     const { license_key, product_id, duration_days } = await c.req.json();
     if (!license_key || !product_id) {
       return c.json({ success: false, msg: '缺少必备参数' }, 400);
+    }
+
+    // 防御：参数超长拦截
+    if (String(license_key).length > 100 || String(product_id).length > 100) {
+      return c.json({ success: false, msg: '参数长度超出上限' }, 400);
     }
 
     // 查询该卡密是否已存在此产品的订阅
@@ -347,6 +359,12 @@ app.post('/licenses/batch', async (c) => {
       return c.json({ success: false, msg: '单次批量操作不能超过 500 条' }, 400);
     }
 
+    // 安全检查：仅允许白名单内置操作
+    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription'];
+    if (!validActions.includes(action)) {
+      return c.json({ success: false, msg: '非法或尚未支持的批量操作指令' }, 400);
+    }
+
     const statements: D1PreparedStatement[] = [];
     let successMsg = '';
 
@@ -410,7 +428,8 @@ app.post('/licenses/batch', async (c) => {
 
       // 6. 批量修改备注
       case 'set_user_name': {
-        const userName = params?.user_name ?? '';
+        // 温和截断防爆
+        const userName = params?.user_name ? String(params.user_name).substring(0, 150) : '';
         keys.forEach((key: string) => {
           statements.push(
             c.env.DB.prepare(`UPDATE Licenses SET user_name = ? WHERE license_key = ?`).bind(userName, key)
