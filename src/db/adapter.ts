@@ -7,7 +7,8 @@ if (typeof process !== 'undefined' && process.env) {
     try {
         // @ts-ignore
         const req = require('module').createRequire(import.meta.url);
-        betterSqlite3 = req('better-sqlite3');
+        const driverName = 'better' + '-sqlite3';
+        betterSqlite3 = req(driverName);
     } catch (_) { }
 }
 
