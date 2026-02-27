@@ -1228,8 +1228,11 @@
               <option value="100" ${PAGE_SIZE === 100 ? 'selected' : ''}>100条/页</option>
             </select>
             <button class="secondary" style="white-space:nowrap; flex-shrink:0;" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>← 上一页</button>
-            <div style="display:flex; align-items:center; padding:0 16px; font-size:14px; color:var(--text-main); background:var(--card-bg); border-radius:6px; border:1px solid var(--border-color); white-space:nowrap; flex-shrink:0;">
-              第 <span style="color:var(--text-bright); font-weight:bold; margin:0 4px;">${currentPage}</span>/ ${totalPages} 页
+            <div style="display:flex; align-items:center; padding:0 12px; font-size:14px; color:var(--text-main); background:var(--card-bg); border-radius:6px; border:1px solid var(--border-color); white-space:nowrap; flex-shrink:0;">
+              第 <input type="number" id="quickPageInput" value="${currentPage}" 
+                style="width: 40px; text-align: center; padding: 2px 0; margin: 0 6px; background: transparent; border: none; color: var(--accent); font-weight: bold; font-size: 14px; border-bottom: 1px dashed var(--border-color); border-radius: 0; outline: none; -moz-appearance: textfield;"
+                title="输入页数后回车跳转"
+                onkeypress="if(event.key==='Enter') quickJumpPage(this, ${totalPages})"> / <span style="margin-left:4px;">${totalPages} 页</span>
             </div>
             <button class="secondary" style="white-space:nowrap; flex-shrink:0;" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>下一页 →</button>
           </div>
@@ -1256,6 +1259,17 @@
       currentPage = page;
       filterLocalList(false);
       window.scrollTo({ top: document.getElementById('licListContainer').offsetTop - 60, behavior: 'smooth' });
+    }
+
+    // 快捷输入页码跳转
+    function quickJumpPage(element, maxPage) {
+      let val = parseInt(element.value);
+      if (isNaN(val)) return;
+      if (val < 1) val = 1;
+      if (val > maxPage) val = maxPage;
+      element.value = val;
+      element.blur();
+      goToPage(val);
     }
 
     // 防抖搜索（300ms延迟）
