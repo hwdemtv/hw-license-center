@@ -1,8 +1,16 @@
 /// <reference types="node" />
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
 
 // 同构数据库驱动适配器
+// 用运行时环境探测代替顶层模块依赖，防止 Cloudflare Worker 构建报错
+let betterSqlite3: any = null;
+if (typeof process !== 'undefined' && process.env) {
+    try {
+        // @ts-ignore
+        const req = require('module').createRequire(import.meta.url);
+        betterSqlite3 = req('better-sqlite3');
+    } catch (_) { }
+}
+
 // 完全模拟 Cloudflare D1 API 签名，以对现有路由逻辑实现 0 侵入替换
 
 export interface D1Result<T = unknown> {
