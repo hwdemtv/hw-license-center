@@ -133,12 +133,53 @@ app.post('/unbind', async (c) => {
       return c.json({ success: false, msg: '参数长度超限' }, 400);
     }
 
-    const result = await c.env.DB.prepare(
-      `DELETE FROM Devices WHERE license_key = ? AND device_id = ? `
-    ).bind(license_key, device_id).run();
+    // --- Phase 12: C 端解绑额度风控逻辑 ---
+    // 1. 查询激活码当前风控状态
+    const licenseResult = await c.env.DB.prepare(
+      `SELECT unbind_count, last_unbind_period FROM Licenses WHERE license_key = ?`
+    ).bind(license_key).first();
 
-    if (result.meta.changes > 0) {
-      return c.json({ success: true, msg: '设备已成功解绑' });
+    if (!licenseResult) {
+      return c.json({ success: false, msg: '无效激活码' }, 404);
+    }
+
+    const now = new Date();
+    // 格式化为 YYYY-MM 周期标识 (东八区简单处理)
+    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let unbindCount = licenseResult.unbind_count as number || 0;
+    const lastPeriod = licenseResult.last_unbind_period as string;
+
+    // 2. 跨月重置判定
+    if (lastPeriod !== currentPeriod) {
+      unbindCount = 0;
+    }
+
+    // 3. 额度校验 (默认每月 3 次)
+    const MAX_UNBIND_PER_MONTH = 3;
+    if (unbindCount >= MAX_UNBIND_PER_MONTH) {
+      return c.json({
+        success: false,
+        msg: `解绑失败。该激活码本月自主解绑额度(${MAX_UNBIND_PER_MONTH}次)已用尽，请联系管理员或下月重试。`,
+        code: 'LIMIT_EXCEEDED'
+      }, 403);
+    }
+
+    // 4. 执行删除设备并原子递增计数器 (利用事务或连续操作)
+    // 注意：D1 目前 batch 比较安全
+    const batchResult = await c.env.DB.batch([
+      c.env.DB.prepare(`DELETE FROM Devices WHERE license_key = ? AND device_id = ?`).bind(license_key, device_id),
+      c.env.DB.prepare(`UPDATE Licenses SET unbind_count = ?, last_unbind_period = ? WHERE license_key = ?`)
+        .bind(unbindCount + 1, currentPeriod, license_key)
+    ]);
+
+    const deleteChanges = (batchResult[0].meta as any).changes;
+
+    if (deleteChanges > 0) {
+      return c.json({
+        success: true,
+        msg: '设备已成功解绑',
+        remaining_count: MAX_UNBIND_PER_MONTH - (unbindCount + 1)
+      });
     } else {
       return c.json({ success: false, msg: '未找到该设备或卡密绑定记录' }, 404);
     }
