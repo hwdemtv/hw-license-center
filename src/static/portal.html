@@ -299,9 +299,13 @@
             <button class="primary" id="btnQuery" onclick="queryDevices()">📡 检索配额状态</button>
 
             <div class="result-area" id="resultArea">
-                <div class="quota-info">
+                <div class="quota-info" style="margin-bottom: 8px;">
                     <span>设备配额使用情况</span>
                     <strong id="quotaText" style="color:var(--text-bright)">- / -</strong>
+                </div>
+                <div class="quota-info">
+                    <span>本月剩余解绑额度</span>
+                    <strong id="unbindQuotaText" style="color:var(--text-bright)">- 次</strong>
                 </div>
                 <div class="device-list" id="deviceList">
                     <!-- devices inject here -->
@@ -415,6 +419,9 @@
             if (data.current_devices >= data.max_devices) qColor = 'var(--warning)';
             document.getElementById('quotaText').innerHTML = '<span style="color:' + qColor + '">' + data.current_devices + '</span> / ' + data.max_devices + ' 台';
 
+            let uColor = data.remaining_unbinds > 0 ? 'var(--text-bright)' : 'var(--danger)';
+            document.getElementById('unbindQuotaText').innerHTML = '<span style="color:' + uColor + '">' + data.remaining_unbinds + '</span> 次';
+
             const listEl = document.getElementById('deviceList');
             if (data.devices.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-main); font-size:12px;">✅ 当前激活码名下无任何物理设备绑定记录，额度充足。<br/><br/>您可以在任意机器上直接使用该卡密！</div>';
@@ -424,12 +431,15 @@
             let html = '';
             data.devices.forEach(d => {
                 const date = new Date(d.last_active).toLocaleString();
+                const btnHtml = data.remaining_unbinds > 0
+                    ? `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>`
+                    : `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0; opacity:0.5; cursor:not-allowed;" disabled title="本月剩余解绑次数已耗尽">次数耗尽</button>`;
                 html += `<div class="device-item">
                     <div style="min-width:0; margin-right:8px;">
                     <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${d.device_name}</div>
                     <div class="dev-time">最近使用: ${date}</div>
                     </div>
-                    <button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>
+                    ${btnHtml}
                         </div>`;
             });
             listEl.innerHTML = html;

@@ -230,10 +230,21 @@ app.get('/portal/devices', async (c) => {
       };
     });
 
+    // 计算剩余解绑额度 (默认上限 3)
+    const MAX_UNBIND_PER_MONTH = 3;
+    const now = new Date();
+    const currentPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    let remainingUnbinds = MAX_UNBIND_PER_MONTH;
+
+    if (license.last_unbind_period === currentPeriod) {
+      remainingUnbinds = Math.max(0, MAX_UNBIND_PER_MONTH - (license.unbind_count || 0));
+    }
+
     return c.json({
       success: true,
       max_devices: license.max_devices,
       current_devices: safeDevices.length,
+      remaining_unbinds: remainingUnbinds,
       devices: safeDevices
     });
 
