@@ -23,9 +23,9 @@ database_id = "beb9e90a-93b0-480e-aa84-c4d958052006" # Keep the existing ID unle
 
 # 自定义域名路由（部署时自动同步到 Cloudflare）
 [[routes]]
-pattern = "km.hwdemtv.com"
+pattern = "km.hwdemtv.com/*"
 custom_domain = true
 
 [[routes]]
-pattern = "kami.hwdemtv.com"
+pattern = "kami.hwdemtv.com/*"
 custom_domain = true
