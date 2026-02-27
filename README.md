@@ -113,6 +113,9 @@ JWT_SECRET = "your-jwt-secret-key-for-device-auth"
 - `ADMIN_SECRET`: 管理员后台登录及 API 鉴权的 Bearer Token（建议32位以上随机字符串）
 
 **可选变量：**
+- `JWT_SECRET`: 用于设备验证 Token 的加密密钥（如不设置，系统会自动生成）
+- `WEBHOOK_SECRET`: 用于支付回调自动发卡的专属鉴权密钥。接入发卡平台时请务必配置，防止恶意刷单。
+
 ---
 
 ### 🌱 方式二：部署到传统 VPS / Node.js (推荐环境独立团队)
