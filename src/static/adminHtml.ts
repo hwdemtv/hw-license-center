@@ -325,7 +325,6 @@ export const adminHtml = `<!DOCTYPE html>
       inset: 0;
       background: var(--bg-color);
       display: flex;
-      items-center: center;
       justify-content: center;
       align-items: center;
       z-index: 1000;
@@ -405,7 +404,7 @@ export const adminHtml = `<!DOCTYPE html>
       transition: 0.2s;
     }
 
-    .dropdown-item: hover.remove-btn {
+    .dropdown-item:hover .remove-btn {
       opacity: 1;
     }
 
@@ -622,12 +621,17 @@ export const adminHtml = `<!DOCTYPE html>
             <option value=""> 所有产品线(Show All) </option>
           </select>
         </div>
-        <div style="display:flex; gap:8px;">
-          <button class="secondary" onclick="exportExcel()" title="导出适合 Excel 阅读的明细表格">📊 导出 Excel </button>
-          <button class="secondary" onclick="exportData()" title="导出 JSON 备份以用于跨端迁移">📤 备份 JSON </button>
-          <button class="secondary" onclick="document.getElementById('importFile').click()" title="通过 JSON 恢复资产">📥 导入还原
-          </button>
-          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <div
+          style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:16px; margin-top:16px;">
+          <div style="display:flex; gap:8px;">
+            <button class="secondary" onclick="exportExcel()" title="导出适合 Excel 阅读的明细表格">📊 导出 Excel </button>
+            <button class="secondary" onclick="exportData()" title="导出 JSON 备份以用于跨端迁移">📤 备份 JSON </button>
+            <button class="secondary" onclick="document.getElementById('importFile').click()" title="通过 JSON 恢复资产">📥
+              导入还原
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+          </div>
+          <div id="topPagination"></div>
         </div>
       </div>
 
@@ -685,8 +689,7 @@ export const adminHtml = `<!DOCTYPE html>
 
     // 分页状态
     let currentPage = 1;
-    const PAGE_SIZE = 20;
-
+    let PAGE_SIZE = 20;  // 每页显示条数
     let PRODUCT_HISTORY = new Set(['smartmp']);
 
     let modalResolve = null;
@@ -1018,18 +1021,52 @@ export const adminHtml = `<!DOCTYPE html>
 
       html += '</div>';
 
-      // 添加分页导航栏
-      if (totalItems > PAGE_SIZE) {
-        html += \`
-      <div class="pagination">
-        <button class="secondary" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>← 上一页</button>
-        <div class="page-info">第 <span style="color:var(--text-bright);font-weight:bold">\${currentPage}</span> / \${totalPages} 页 (共 \${totalItems} 条)</div>
-        <button class="secondary" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>下一页 →</button>
-      </div>
-    \`;
+      html += '</div>';
+
+      // ==========================================
+      // 更新顶部及底部分页导航 (提取逻辑)
+      // ==========================================
+      const renderPagination = () => {
+        if (totalItems === 0) return '';
+        return \`
+          <div style="display:flex; align-items:stretch; gap:8px;">
+            <select style="padding:0 12px; font-size:14px; border-radius:6px; background:#21262d; color:var(--text-bright); border:1px solid var(--border-color); outline:none; cursor:pointer;" onchange="changePageSize(this.value)">
+              <option value="10" \${PAGE_SIZE === 10 ? 'selected' : ''}>10条/页</option>
+              <option value="20" \${PAGE_SIZE === 20 ? 'selected' : ''}>20条/页</option>
+              <option value="50" \${PAGE_SIZE === 50 ? 'selected' : ''}>50条/页</option>
+              <option value="100" \${PAGE_SIZE === 100 ? 'selected' : ''}>100条/页</option>
+            </select>
+            <button class="secondary" style="white-space:nowrap; flex-shrink:0;" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>← 上一页</button>
+            <div style="display:flex; align-items:center; padding:0 16px; font-size:14px; color:var(--text-main); background:var(--card-bg); border-radius:6px; border:1px solid var(--border-color); white-space:nowrap; flex-shrink:0;">
+              第 <span style="color:var(--text-bright); font-weight:bold; margin:0 4px;">\${currentPage}</span>/ \${totalPages} 页
+            </div>
+            <button class="secondary" style="white-space:nowrap; flex-shrink:0;" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>下一页 →</button>
+          </div>
+        \`;
+      };
+
+      const topPag = document.getElementById('topPagination');
+      if (topPag) {
+        topPag.innerHTML = renderPagination();
       }
 
       container.innerHTML = html;
+    }
+
+    // 切换分页大小
+    function changePageSize(size) {
+      PAGE_SIZE = parseInt(size);
+      currentPage = 1;
+      const kw = document.getElementById('keywordSearch').value.toLowerCase();
+      if (kw) {
+        const filtered = ALL_LICENSES.filter((l) =>
+          l.license_key.toLowerCase().includes(kw) ||
+          (l.user_name && l.user_name.toLowerCase().includes(kw))
+        );
+        renderCards(filtered);
+      } else {
+        renderCards(ALL_LICENSES);
+      }
     }
 
     // 分页跳转函数
