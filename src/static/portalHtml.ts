@@ -1,4 +1,5 @@
-export const portalHtml = <!DOCTYPE html>
+export const portalHtml = `
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -331,7 +332,7 @@ export const portalHtml = <!DOCTYPE html>
         let currentKey = '';
 
         function formatLicenseKey(el) {
-            el.value = el.value.replace(/\\\s+/g, '').toUpperCase();
+            el.value = el.value.replace(/\\s+/g, '').toUpperCase();
             document.getElementById('btnClear').style.display = el.value ? 'block' : 'none';
             document.getElementById('btnPaste').style.display = el.value ? 'none' : 'block';
         }
@@ -432,21 +433,21 @@ export const portalHtml = <!DOCTYPE html>
             data.devices.forEach(d => {
                 const date = new Date(d.last_active).toLocaleString();
                 const btnHtml = data.remaining_unbinds > 0
-                    ? `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>`
-                    : `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0; opacity:0.5; cursor:not-allowed;" disabled title="本月剩余解绑次数已耗尽">次数耗尽</button>`;
-                html += `<div class="device-item">
+                    ? \`<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('\${d.device_id}')">断开授权</button>\`
+                    : \`<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0; opacity:0.5; cursor:not-allowed;" disabled title="本月剩余解绑次数已耗尽">次数耗尽</button>\`;
+                html += \`<div class="device-item">
                     <div style="min-width:0; margin-right:8px;">
-                    <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${d.device_name}</div>
-                    <div class="dev-time">最近使用: ${date}</div>
+                    <div class="dev-name" title="为了保护隐私，已掩盖部分名称">\${d.device_name}</div>
+                    <div class="dev-time">最近使用: \${date}</div>
                     </div>
-                    ${btnHtml}
-                        </div>`;
+                    \${btnHtml}
+                        </div>\`;
             });
             listEl.innerHTML = html;
         }
 
         async function unbindDevice(deviceId) {
-            const confirmed = await showConfirm('⚠️ 危险操作：\\\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！');
+            const confirmed = await showConfirm('⚠️ 危险操作：\\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！');
             if (!confirmed) return;
 
             try {
@@ -470,4 +471,5 @@ export const portalHtml = <!DOCTYPE html>
     </script>
 </body>
 
-</html>;
+</html>
+`;
