@@ -1001,10 +1001,10 @@
         </div>
 
         <!-- Col 3: 设备占用 -->
-        <div style="font-size:12px;">
-          <div style="color:var(--text-bright); margin-bottom:4px; font-weight:500; display:flex; align-items:center; gap:6px;">
-            <span>${lic.current_devices} <span style="color:var(--text-main); font-weight:normal;">/ ${lic.max_devices} 台</span></span>
-            <span onclick="toggleDevicePanel('${lic.license_key}')" style="cursor:pointer; font-size:10px; background:#21262d; border:1px solid #30363d; padding:2px 4px; border-radius:4px; color:var(--text-main); hover:color:var(--text-bright);">🔍 详情</span>
+        <div style="font-size:12px; display:flex; flex-direction:column; justify-content:center;">
+          <div style="color:var(--text-bright); margin-bottom:4px; font-weight:500; display:flex; align-items:center;">
+            <div style="flex-shrink:0;">${lic.current_devices} <span style="color:var(--text-main); font-weight:normal;">/ ${lic.max_devices} 台</span></div>
+            <button class="secondary" onclick="toggleDevicePanel('${lic.license_key}')" style="margin-left:6px; padding:2px 6px; font-size:11px; height:auto; background:var(--panel-bg); border-color:#30363d; flex-shrink:0;" title="展开查看具体设备">🔍 详情</button>
           </div>
           <div style="height:4px; width:100%; max-width:80px; background:#30363d; border-radius:2px; overflow:hidden;">
             <div style="width:${devicePct}%; height:100%; background:var(--accent);"></div>
