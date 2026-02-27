@@ -1,10 +1,13 @@
 name = "hw-license-center"
 main = "src/index.ts"
-compatibility_date = "2025-02-14"
+compatibility_date = "2024-04-03"
 workers_dev = true
-
-# Node.js compatibility for machine-id etc if needed
 compatibility_flags = [ "nodejs_compat" ]
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallbacks = []
 
 # Bindings for D1 Database
 [[d1_databases]]
@@ -14,8 +17,9 @@ database_id = "beb9e90a-93b0-480e-aa84-c4d958052006" # Keep the existing ID unle
 
 # Variables
 [vars]
-# WARNING: you should probably set this via wrangler secret put ADMIN_SECRET instead
-ADMIN_SECRET = "super-secret-admin-key-2026"
+# 生产环境中已通过 wrangler secret 配置：
+# - ADMIN_SECRET (管理员后台登录密钥)
+# - JWT_SECRET (针对客户端 Token 的签名密钥)
 
 # 自定义域名路由（部署时自动同步到 Cloudflare）
 [[routes]]
