@@ -43,7 +43,8 @@ export class DBAdapter {
             this.d1Db = envDb;
         } else {
             try {
-                const Database = require('better-sqlite3');
+                const driverName = 'better' + '-sqlite3';
+                const Database = require(driverName);
                 // 使用相对路径寻找本地数据库 (与 Cloudflare 本地模拟路径一致或指定文件)
                 this.nativeDb = new Database('.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite', { fileMustExist: false });
                 this.nativeDb.pragma('journal_mode = WAL');
