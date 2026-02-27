@@ -7,6 +7,7 @@ import { rateLimiter } from './middleware/rate-limiter';
 import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
 import { adminHtml } from './static/adminHtml';
+import { portalHtml } from './static/portalHtml';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -24,9 +25,14 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// 挂载对外公开的核心 API (verify / unbind)
 // 对外验证接口：限流 60 秒 15 次，防刷
 app.use('/api/v1/auth/verify', rateLimiter({ max: 15, window: 60 }));
+// 对外解绑接口：限流 60 秒 5 次 (防恶意踢人)
+app.use('/api/v1/auth/unbind', rateLimiter({ max: 5, window: 60 }));
+// 门户查询接口：限流 60 秒 5 次 
+app.use('/api/v1/auth/portal/*', rateLimiter({ max: 5, window: 60 }));
+
+// 挂载对外公开的核心 API (verify / unbind / portal)
 app.route('/api/v1/auth', publicRoutes);
 
 // 挂载管理员接口全局拦截器
@@ -39,5 +45,6 @@ app.route('/api/v1/auth/admin', adminRoutes);
 
 // 挂载纯前端单页应用
 app.get('/admin', (c) => c.html(adminHtml));
+app.get('/portal', (c) => c.html(portalHtml));
 
 export default app;

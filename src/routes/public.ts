@@ -148,5 +148,59 @@ app.post('/unbind', async (c) => {
   }
 });
 
+// API: (C端自助查询门户) 获取指定卡密的设备清单
+app.get('/portal/devices', async (c) => {
+  try {
+    const key = c.req.query('key');
+    if (!key) return c.json({ success: false, msg: '缺少激活码' }, 400);
+
+    if (String(key).length > 128) {
+      return c.json({ success: false, msg: '参数长度超限' }, 400);
+    }
+
+    // 查询该卡是否合法
+    const { results: licenses } = await c.env.DB.prepare(
+      `SELECT * FROM Licenses WHERE license_key = ?`
+    ).bind(key).all();
+
+    if (licenses.length === 0) {
+      // 模糊提示防枚举
+      return c.json({ success: false, msg: '找不到有效授权或已过期' }, 404);
+    }
+
+    const license: any = licenses[0];
+    if (license.status === 'revoked') {
+      return c.json({ success: false, msg: '找不到有效授权或已过期' }, 404);
+    }
+
+    // 查设备
+    const { results: devices } = await c.env.DB.prepare(
+      `SELECT device_id, device_name, last_active FROM Devices WHERE license_key = ? ORDER BY last_active DESC`
+    ).bind(key).all();
+
+    // 简单掩模部分设备名，保护隐私，同时回传完整 device_id 供解绑使用
+    const safeDevices = devices.map((d: any) => {
+      const n = String(d.device_name || '未命名设备');
+      const maskedName = n.length > 3 ? n.substring(0, 3) + '***' : n + '***';
+      return {
+        device_id: d.device_id,
+        device_name: maskedName,
+        last_active: d.last_active
+      };
+    });
+
+    return c.json({
+      success: true,
+      max_devices: license.max_devices,
+      current_devices: safeDevices.length,
+      devices: safeDevices
+    });
+
+  } catch (error) {
+    console.error(error);
+    return c.json({ success: false, msg: '查询服务遇到内部错误' }, 500);
+  }
+});
+
 
 export default app;
