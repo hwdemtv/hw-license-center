@@ -23,3 +23,4 @@ database_id = "<YOUR_D1_DATABASE_ID>" # Replace with your real DB ID, you can ge
 # The following vars MUST be set in production through wrangler secrets:
 # npx wrangler secret put ADMIN_SECRET
 # npx wrangler secret put JWT_SECRET
+# npx wrangler secret put WEBHOOK_SECRET

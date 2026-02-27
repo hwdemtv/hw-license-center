@@ -1,4 +1,7 @@
 /// <reference types="node" />
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 // 同构数据库驱动适配器
 // 完全模拟 Cloudflare D1 API 签名，以对现有路由逻辑实现 0 侵入替换
 

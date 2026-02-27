@@ -6,6 +6,7 @@ import { adminAuthMiddleware } from './middleware/auth';
 import { rateLimiter } from './middleware/rate-limiter';
 import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
+import webhookRoutes from './routes/webhook';
 import { adminHtml } from './static/adminHtml';
 import { portalHtml } from './static/portalHtml';
 
@@ -17,6 +18,12 @@ const app = new Hono<{ Bindings: Env }>();
 // 若环境为 Cloudflare Workers，则代理调用；若为原生 Node.js，则在此注入本地 SQLite 实例，平层替换 c.env.DB。
 app.use('*', async (c, next) => {
   if (!c.env) (c as any).env = {};
+
+  // 在 Node.js 环境下，补充 process.env 到 c.env
+  if (typeof process !== 'undefined' && process.env) {
+    Object.assign(c.env, process.env);
+  }
+
   c.env.DB = new DBAdapter(c.env.DB) as any;
   await next();
 });
@@ -60,8 +67,12 @@ app.use('/api/v1/auth/verify', rateLimiter({ max: 15, window: 60 }));
 app.use('/api/v1/auth/unbind', rateLimiter({ max: 5, window: 60 }));
 // 门户查询接口：限流 60 秒 5 次 
 app.use('/api/v1/auth/portal/*', rateLimiter({ max: 5, window: 60 }));
+// Webhook 支付回调接口：限流 60 秒 20 次
+app.use('/api/v1/auth/webhook/*', rateLimiter({ max: 20, window: 60 }));
 
-// 挂载对外公开的核心 API (verify / unbind / portal)
+// 核心路由挂载
+// 先挂载更具体的 Webhook 路径，防止被通用的 /api/v1/auth 遮蔽
+app.route('/api/v1/auth/webhook', webhookRoutes);
 app.route('/api/v1/auth', publicRoutes);
 
 // 挂载管理员接口全局拦截器

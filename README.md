@@ -234,7 +234,13 @@ pm2 start dist/server.js --name "hw-license-center"
   - 请求体：`{ count, max_devices, duration_days, product_id, user_name }`
   - 响应：`{ success, keys: [...] }`
 
-详细参数请参考 `src/index.ts` 源码。
+**支付/发卡 Webhook 接口 (M2M)：**
+- `POST /api/v1/auth/webhook/pay` - 第三方支付回调自动发卡
+  - 鉴权：支持 `Authorization: Bearer {WEBHOOK_SECRET}` 或 URL 参数 `?token={WEBHOOK_SECRET}`
+  - 参数：`{ product_id, count, max_devices, duration_days, out_trade_no }`
+  - 响应：`{ success, keys: ["KEY-1", "KEY-2"], text_result: "KEY-1\nKEY-2" }`
+
+详细参数请参考 `src/app.ts` 源码。
 
 ---
 
