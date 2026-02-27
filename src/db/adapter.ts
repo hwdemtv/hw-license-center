@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { createRequire } from 'module';
+import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 // 同构数据库驱动适配器
