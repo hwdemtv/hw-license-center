@@ -176,51 +176,6 @@ app.delete('/licenses', async (c) => {
   }
 });
 
-// API: (管理员) 添加或续费产品订阅 (Upsert)
-app.post('/subscriptions', async (c) => {
-  try {
-
-    const { license_key, product_id, duration_days } = await c.req.json();
-    if (!license_key || !product_id) {
-      return c.json({ success: false, msg: '缺少必要参数 (license_key, product_id)' }, 400);
-    }
-
-    // 拦截清除指令：如果输入的天数 <= 0，则视为删除此产品的订阅记录
-    if (duration_days !== undefined && typeof duration_days === 'number' && duration_days <= 0) {
-      const delResult = await c.env.DB.prepare(
-        `DELETE FROM Subscriptions WHERE license_key = ? AND product_id = ?`
-      ).bind(license_key, product_id).run();
-
-      if (delResult.meta?.changes > 0) {
-        return c.json({ success: true, msg: `已清除此卡密下的 [${product_id}] 产品权限`, deleted: true });
-      } else {
-        return c.json({ success: false, msg: `未找到 [${product_id}] 产品权限，无法清除` }, 404);
-      }
-    }
-
-    // 计算到期时间
-    let expiresAt: string | null = null;
-    if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
-      const date = new Date();
-      date.setDate(date.getDate() + duration_days);
-      expiresAt = date.toISOString();
-    }
-
-    // 针对指定卡密、产品记录执行 Upsert：如果存在就更新到期时间，否则插入
-    await c.env.DB.prepare(
-      `INSERT INTO Subscriptions (license_key, product_id, expires_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(license_key, product_id)
-       DO UPDATE SET expires_at = excluded.expires_at`
-    ).bind(license_key, product_id, expiresAt).run();
-
-    let readableDate = expiresAt ? new Date(expiresAt).toLocaleDateString() : '永久有效';
-    return c.json({ success: true, msg: '订阅配置更新成功', expires_at: readableDate });
-  } catch (error) {
-    console.error(error);
-    return c.json({ success: false, msg: '添加订阅失败，检查卡密是否存在' }, 500);
-  }
-});
 
 // API: (管理员) 批量导入激活码数据
 app.post('/licenses/import', async (c) => {

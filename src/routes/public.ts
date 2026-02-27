@@ -92,8 +92,11 @@ app.post('/verify', async (c) => {
       server_time: new Date().toISOString()
     };
 
-    // 如果开发者未在 Secrets 中配置 JWT_SECRET，我们回退一个默认的（生产应避免此情况）
-    const trueToken = await sign(safePayload, c.env.JWT_SECRET || 'fallback-jwt-secret');
+    // 强制验证是否配置了秘钥
+    if (!c.env.JWT_SECRET) {
+      return c.json({ success: false, msg: '服务器配置错误：未配置有效安全通讯秘钥(JWT_SECRET)' }, 500);
+    }
+    const trueToken = await sign(safePayload, c.env.JWT_SECRET);
 
     return c.json({
       success: true,
