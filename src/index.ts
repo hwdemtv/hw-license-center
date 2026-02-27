@@ -11,11 +11,30 @@ import { portalHtml } from './static/portalHtml';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// 仅允许 Obsidian 插件和自有域名的跨域请求
-app.use('/api/*', cors({
-  origin: ['obsidian://', 'app://', 'https://km.hwdemtv.com', 'https://kami.hwdemtv.com', 'https://hw-license-center.hwdemtv.workers.dev'],
-  allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],
-}));
+// 通用跨域处理：优先使用环境变量，不填则退化为仅拦截特殊情形
+app.use('/api/*', async (c, next) => {
+  const allowedOriginsStr = c.env.ALLOWED_ORIGINS;
+  const whitelist = allowedOriginsStr ? allowedOriginsStr.split(',').map(s => s.trim()) : [];
+
+  const corsMiddleware = cors({
+    origin: (origin) => {
+      if (!origin) return '*';
+      // 内部协议始终放行
+      if (origin.startsWith('obsidian://') || origin.startsWith('app://')) return origin;
+
+      // 如果未配置白名单（开源默认态），放行任意来源以降低门槛
+      if (whitelist.length === 0) return origin;
+
+      // 如果配置了白名单，则严格匹配
+      if (whitelist.includes(origin) || whitelist.includes('*')) return origin;
+
+      return null;
+    },
+    allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],
+  });
+
+  return corsMiddleware(c, next);
+});
 
 // 简易请求耗时打印
 app.use('*', loggerMiddleware);

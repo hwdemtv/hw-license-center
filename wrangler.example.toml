@@ -1,0 +1,25 @@
+name = "hw-license-center"
+main = "src/index.ts"
+compatibility_date = "2024-04-03"
+workers_dev = true
+compatibility_flags = [ "nodejs_compat" ]
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallbacks = []
+
+# Bindings for D1 Database
+[[d1_databases]]
+binding = "DB" # Available in your code as env.DB
+database_name = "smart-mp-db"
+database_id = "<YOUR_D1_DATABASE_ID>" # Replace with your real DB ID, you can get it by running: npx wrangler d1 create smart-mp-db
+
+# Variables
+[vars]
+# (Optional) Comma separated domains to allow CORS requests from. If empty, allows '*'.
+# ALLOWED_ORIGINS = "https://your-domain.com, https://another-domain.com"
+
+# The following vars MUST be set in production through wrangler secrets:
+# npx wrangler secret put ADMIN_SECRET
+# npx wrangler secret put JWT_SECRET

@@ -31,33 +31,45 @@
 ## 🚀 快速开始
 
 ### 1. 准备工作
-确保已安装 Node.js 并在终端登录 Cloudflare：
+确保已安装 Node.js 并在终端安全登录 Cloudflare 边缘账号：
 ```bash
 npx wrangler login
 ```
 
-### 2. 初始化数据库
-执行仓库中的 `schema.sql`：
+### 2. 核心配置文件初始化
+本项目提供了一份抽离了敏感 ID 的标准开箱即用模板，请执行：
 ```bash
-npx wrangler d1 execute smart-mp-db --file=./schema.sql
+cp wrangler.example.toml wrangler.toml
 ```
 
-**数据库结构：**
-- `Licenses` - 卡密主表（存储激活码、状态、配额等）
-- `Devices` - 设备绑定表（存储设备 ID、名称、最后活跃时间）
-- `Subscriptions` - 订阅详情表（存储卡密对应的各产品有效期）
+### 3. 创建智能边缘数据库 (D1)
+执行以下命令创建 SQLite 的边缘分发版本，**并记得将控制台输出的 `database_id` 填入刚刚拷贝的 `wrangler.toml` 内**：
+```bash
+npx wrangler d1 create smart-mp-db
+```
 
-完整表结构见项目根目录的 `schema.sql` 文件。
+### 4. 写入业务表结构数据
+执行内置的架构感知脚本，将其同步至本地研发与远程产线：
+```bash
+npx wrangler d1 execute smart-mp-db --local --file=./schema.sql
+npx wrangler d1 execute smart-mp-db --remote --file=./schema.sql
+```
 
-### 3. 本地开发
+**数据库基石结构：**
+- `Licenses` - 卡密主表（存储激活码、风控属性等）
+- `Devices` - 设备指纹表（记录多端授权挂载状态）
+- `Subscriptions` - 多产品订阅表（精细化时间控制与降级容灾）
+
+### 5. 本地联调与预览
 ```bash
 npm install
 npm run dev
 ```
 
-### 4. 生产部署
+### 6. 发射到外太空 (生产部署)
+所有测试完成后，无需管理服务器，一键发布至全球 300+ 边缘节点：
 ```bash
-npx wrangler deploy src/index.ts
+npx wrangler deploy
 ```
 
 > 📘 **更多部署方案**：如需部署到VPS或了解其他部署方式，请查看 [DEPLOYMENT.md](./DEPLOYMENT.md) 文档。

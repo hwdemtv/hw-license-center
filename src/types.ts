@@ -2,6 +2,7 @@ export interface Env {
     DB: D1Database;
     ADMIN_SECRET: string;
     JWT_SECRET: string;
+    ALLOWED_ORIGINS?: string;
 }
 
 // 辅助函数：生成随机卡密，支持传入指定前缀
