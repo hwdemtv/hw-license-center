@@ -331,6 +331,12 @@ export const portalHtml = `
                     <!-- devices inject here -->
                 </div>
             </div>
+            <div class="rule-tips">
+                <div class="rule-tips-title">💡 温馨提示</div>
+                1. 为了保障账户安全，每个激活码每月仅支持有限次数的自主换绑。<br/>
+                2. 解绑名额将在每月 1 号凌晨自动重置。<br/>
+                3. 若额度耗尽且确需更换设备，请联系管理员处理。
+            </div>
         </div>
     </div>
 
