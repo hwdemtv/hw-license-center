@@ -113,7 +113,56 @@ JWT_SECRET = "your-jwt-secret-key-for-device-auth"
 - `ADMIN_SECRET`: 管理员后台登录及 API 鉴权的 Bearer Token（建议32位以上随机字符串）
 
 **可选变量：**
-- `JWT_SECRET`: 用于设备验证 Token 的加密密钥（如不设置，系统会自动生成）
+---
+
+### 🌱 方式二：部署到传统 VPS / Node.js (推荐环境独立团队)
+
+本中心底层采用了 **抽象数据访问层 (DBAdapter)**，不仅原生支持 Cloudflare D1，也完美兼容传统 Node.js 环境下的 `better-sqlite3`。你可以将本项目零修改地运行在任意带 Node 环境的服务器上。
+
+#### 步骤 1：准备环境与配置
+确保你的服务器已安装 `Node.js (v18+)`。
+```bash
+# 1. 克隆并进入目录
+git clone https://github.com/hwdemtv/hw-license-center.git
+cd hw-license-center
+
+# 2. 安装全部全栈依赖
+npm install
+
+# 3. 配置安全密钥 (将生成两个环境变量)
+# 复制出 wrangler.example.toml 里提到的通信 JWT_SECRET 和后台访问 ADMIN_SECRET
+echo "JWT_SECRET=你自己的长随机验证密钥" > .env
+echo "ADMIN_SECRET=你自己的控制台登录密钥" >> .env
+```
+
+#### 步骤 2：初始化本地 SQLite 数据库
+由于脱离了 Cloudflare，我们需要在本地创建一个 SQLite 文件来承载数据。
+使用项目内置的 `schema.sql` 直接生成本地本地数据库库：
+```bash
+# 安装 sqlite3 命令行工具 (Ubuntu: apt install sqlite3 / CentOS: yum install sqlite)
+mkdir -p .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
+sqlite3 .wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite < schema.sql
+```
+
+#### 步骤 3：原生启动服务 / PM2 守护
+项目内置了由 `tsx` 和 `@hono/node-server` 驱动的本地双栖入口 `src/server.node.ts`。
+
+**开发测试模式：**
+```bash
+npm run dev:node
+# 默认将在本地 3000 端口启动：http://localhost:3000
+```
+
+**生产编译部署 (使用 PM2 守护)：**
+```bash
+# 1. ESBuild 打包为单文件后端
+npm run build:node
+
+# 2. 启动 PM2 守护独立服务
+npm install -g pm2
+pm2 start dist/server.js --name "hw-license-center"
+```
+完成部署后，你可以使用 Nginx 反向代理将你的 `km.yourdomain.com` 代理到本地的 `3000` 端口。
 
 ---
 
