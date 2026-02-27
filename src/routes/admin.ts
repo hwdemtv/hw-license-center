@@ -372,4 +372,161 @@ app.delete('/subscriptions', async (c) => {
 });
 
 
+// ==========================================
+// API: (管理员) 通用批量操作接口
+// ==========================================
+app.post('/licenses/batch', async (c) => {
+  try {
+    const { keys, action, params } = await c.req.json();
+
+    // 基本参数校验
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return c.json({ success: false, msg: '未选择任何卡密' }, 400);
+    }
+    if (!action || typeof action !== 'string') {
+      return c.json({ success: false, msg: '缺少操作类型' }, 400);
+    }
+
+    // 安全上限：单次最多操作 500 条
+    if (keys.length > 500) {
+      return c.json({ success: false, msg: '单次批量操作不能超过 500 条' }, 400);
+    }
+
+    const statements: D1PreparedStatement[] = [];
+    let successMsg = '';
+
+    switch (action) {
+      // 1. 批量吊销
+      case 'revoke':
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET status = 'revoked' WHERE license_key = ?`).bind(key)
+          );
+        });
+        successMsg = `已吊销 ${keys.length} 个卡密`;
+        break;
+
+      // 2. 批量恢复
+      case 'restore':
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET status = 'active' WHERE license_key = ?`).bind(key)
+          );
+        });
+        successMsg = `已恢复 ${keys.length} 个卡密`;
+        break;
+
+      // 3. 批量删除（级联删除设备 + 订阅 + 主记录）
+      case 'delete':
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`DELETE FROM Devices WHERE license_key = ?`).bind(key),
+            c.env.DB.prepare(`DELETE FROM Subscriptions WHERE license_key = ?`).bind(key),
+            c.env.DB.prepare(`DELETE FROM Licenses WHERE license_key = ?`).bind(key)
+          );
+        });
+        successMsg = `已彻底销毁 ${keys.length} 个卡密及其所有关联数据`;
+        break;
+
+      // 4. 批量解绑设备
+      case 'unbind':
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`DELETE FROM Devices WHERE license_key = ?`).bind(key)
+          );
+        });
+        successMsg = `已清空 ${keys.length} 个卡密的所有设备绑定`;
+        break;
+
+      // 5. 批量修改设备上限
+      case 'set_max_devices': {
+        const maxDevices = parseInt(params?.max_devices);
+        if (!maxDevices || maxDevices < 1 || maxDevices > 100) {
+          return c.json({ success: false, msg: '设备上限必须在 1-100 之间' }, 400);
+        }
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET max_devices = ? WHERE license_key = ?`).bind(maxDevices, key)
+          );
+        });
+        successMsg = `已将 ${keys.length} 个卡密的设备上限统一调整为 ${maxDevices} 台`;
+        break;
+      }
+
+      // 6. 批量修改备注
+      case 'set_user_name': {
+        const userName = params?.user_name ?? '';
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET user_name = ? WHERE license_key = ?`).bind(userName, key)
+          );
+        });
+        successMsg = `已将 ${keys.length} 个卡密的备注统一设置为 "${userName || '(空)'}"`;
+        break;
+      }
+
+      // 7. 批量续费/添加产品订阅
+      case 'add_subscription': {
+        const productId = params?.product_id;
+        const durationDays = parseInt(params?.duration_days);
+        if (!productId) {
+          return c.json({ success: false, msg: '缺少产品 ID' }, 400);
+        }
+        let expiresAt: string | null = null;
+        if (durationDays && durationDays > 0) {
+          const date = new Date();
+          date.setDate(date.getDate() + durationDays);
+          expiresAt = date.toISOString();
+        }
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(
+              `INSERT INTO Subscriptions (license_key, product_id, expires_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(license_key, product_id)
+               DO UPDATE SET expires_at = excluded.expires_at`
+            ).bind(key, productId, expiresAt)
+          );
+        });
+        const dateLabel = expiresAt ? new Date(expiresAt).toLocaleDateString() : '永久';
+        successMsg = `已为 ${keys.length} 个卡密添加 [${productId}] 产品权限 (${dateLabel})`;
+        break;
+      }
+
+      // 8. 批量移除产品订阅
+      case 'remove_subscription': {
+        const rmProductId = params?.product_id;
+        if (!rmProductId) {
+          return c.json({ success: false, msg: '缺少要移除的产品 ID' }, 400);
+        }
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`DELETE FROM Subscriptions WHERE license_key = ? AND product_id = ?`).bind(key, rmProductId)
+          );
+        });
+        successMsg = `已从 ${keys.length} 个卡密中移除 [${rmProductId}] 产品权限`;
+        break;
+      }
+
+      default:
+        return c.json({ success: false, msg: '不支持的操作类型: ' + action }, 400);
+    }
+
+    // 使用 D1 batch 分片执行，每批最多 50 条语句
+    if (statements.length > 0) {
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+        const chunk = statements.slice(i, i + BATCH_SIZE);
+        await c.env.DB.batch(chunk);
+      }
+    }
+
+    return c.json({ success: true, msg: successMsg });
+  } catch (error: any) {
+    console.error('Batch Error:', error);
+    return c.json({ success: false, msg: '批量操作失败: ' + (error.message || '未知错误') }, 500);
+  }
+});
+
+
 export default app;

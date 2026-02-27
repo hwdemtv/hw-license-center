@@ -418,9 +418,80 @@ export const adminHtml = `<!DOCTYPE html>
       width: 6px;
     }
 
-    .custom-dropdown::-webkit-scrollbar - thumb {
+    .custom-dropdown::-webkit-scrollbar-thumb {
       background: var(--border-color);
       border-radius: 10px;
+    }
+
+    /* 分页控件样式 */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+      padding: 16px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .pagination button {
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+
+    .pagination .page-info {
+      font-size: 13px;
+      color: var(--text-main);
+      background: var(--card-bg);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    /* 批量操作悬浮条 */
+    .batch-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 12px 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .batch-bar.active {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .batch-bar button {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .batch-count {
+      background: var(--accent);
+      color: var(--bg-color);
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-right: 12px;
+    }
+
+    .custom-checkbox {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
     }
   </style>
 
@@ -580,9 +651,42 @@ export const adminHtml = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- 批量操作悬浮条 -->
+  <div class="batch-bar" id="batchBar">
+    <div class="batch-count" id="batchCountDisplay">0</div>
+    <select id="batchActionSelect"
+      style="background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:6px 12px; font-size:13px; outline:none;">
+      <option value="" disabled selected>👉 选择批量动作...</option>
+      <optgroup label="基础数据">
+        <option value="revoke">🔒 批量吊销</option>
+        <option value="restore">🔓 批量恢复</option>
+        <option value="delete">🗑️ 批量彻底删除</option>
+        <option value="set_user_name">📝 批量修改备注</option>
+        <option value="copy_keys">📋 复制选中的激活码</option>
+      </optgroup>
+      <optgroup label="产品与订阅">
+        <option value="add_subscription">🚀 批量续费 / 加产品</option>
+        <option value="remove_subscription">❌ 批量移除产品权限</option>
+      </optgroup>
+      <optgroup label="设备">
+        <option value="unbind">📱 批量释放所有设备</option>
+        <option value="set_max_devices">🔢 批量修改设备上限</option>
+      </optgroup>
+    </select>
+    <button class="primary" onclick="executeBatch()">🚀 确定执行</button>
+    <button class="secondary" onclick="clearBatchSelection()">清空勾选</button>
+  </div>
+
   <script>
     let ADMIN_SECRET = "";
     let ALL_LICENSES = []; // 本地数据缓存
+    let SET_SELECTED_KEYS = new Set(); // 批量选中的 keys
+
+
+    // 分页状态
+    let currentPage = 1;
+    const PAGE_SIZE = 20;
+
     let PRODUCT_HISTORY = new Set(['smartmp']);
 
     let modalResolve = null;
@@ -794,6 +898,7 @@ export const adminHtml = `<!DOCTYPE html>
         }
 
         ALL_LICENSES = data.data;
+        currentPage = 1; // 重新拉取后重置为第一页
         updateStats();
         updateProductHelpers();
         renderCards(ALL_LICENSES);
@@ -810,41 +915,64 @@ export const adminHtml = `<!DOCTYPE html>
         return;
       }
 
+      // 获取所有经过过滤后的卡密 ID，以便全选使用
+      const currentFilteredKeys = list.map(l => l.license_key);
+
+      // 检查是否在当前列表和集合中全选了
+      const isAllChecked = list.length > 0 && list.every(l => SET_SELECTED_KEYS.has(l.license_key));
+
       let html = '<div class="lic-list">';
       html += \`
-    <div class="lic-header">
+    <div class="lic-header" style="grid-template-columns: 30px 1.5fr 1.5fr 1fr 1fr;">
+      <div><input type="checkbox" class="custom-checkbox" \${isAllChecked ? 'checked' : ''} onclick="toggleAllCheckboxes(this)" title="全选当前列表"></div>
       <div>授权标识 & 使用者</div>
       <div>产品权限与有效期</div>
       <div>在线设备</div>
       <div style="text-align:right">操作</div>
     </div>
   \`;
-  
-  const now = new Date();
 
-  list.forEach((lic) => {
-    // 准备订阅状态 HTML
-    let subHtml='';
-    if (lic.subscriptions && lic.subscriptions.length> 0) {
-      subHtml = lic.subscriptions.map((s) => {
-        let text='永 久';
-        let cls='badge-success';
-        if (s.expires_at) {
-          const days = Math.ceil((new Date(s.expires_at) - now) / (86400000));
-          text = days> 0 ? '剩 ' + days + ' 天' : '已过期';
-          cls = days> 7 ? 'badge-success' : (days> 0 ? 'badge-warning' : 'badge-danger');
+      const now = new Date();
+
+      // 分页计算
+      const totalItems = list.length;
+      const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+      // 防御性纠正
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIndex = (currentPage - 1) * PAGE_SIZE;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+      const pagedList = list.slice(startIndex, endIndex);
+
+      pagedList.forEach((lic) => {
+        // 准备订阅状态 HTML
+        let subHtml = '';
+        if (lic.subscriptions && lic.subscriptions.length > 0) {
+          subHtml = lic.subscriptions.map((s) => {
+            let text = '永 久';
+            let cls = 'badge-success';
+            if (s.expires_at) {
+              const days = Math.ceil((new Date(s.expires_at) - now) / (86400000));
+              text = days > 0 ? '剩 ' + days + ' 天' : '已过期';
+              cls = days > 7 ? 'badge-success' : (days > 0 ? 'badge-warning' : 'badge-danger');
+            }
+            return '<span class="badge ' + cls + '" style="margin-right:4px;">' + s.product_id + ': ' + text + '</span>';
+          }).join('');
+        } else {
+          subHtml = '<span style="color:var(--text-main); font-size:11px; font-style:italic">暂无订阅产品</span>';
         }
-        return '<span class="badge ' + cls + '" style="margin-right:4px;">' + s.product_id + ': ' + text + '</span>';
-      }).join('');
-    } else {
-      subHtml='<span style="color:var(--text-main); font-size:11px; font-style:italic">暂无订阅产品</span>';
-    }
 
-    const isRevoked = lic.status ==='revoked';
-    const devicePct = Math.min(100, (lic.current_devices / lic.max_devices) * 100);
+        const isRevoked = lic.status === 'revoked';
+        const devicePct = Math.min(100, (lic.current_devices / lic.max_devices) * 100);
 
-    html += \`
-      <div class="lic-row">
+        html += \`
+      <div class="lic-row" style="grid-template-columns: 30px 1.5fr 1.5fr 1fr 1fr;">
+        <!-- Col 0: Checkbox -->
+        <div style="display:flex; align-items:center;">
+          <input type="checkbox" class="custom-checkbox row-checkbox" value="\${lic.license_key}" \${SET_SELECTED_KEYS.has(lic.license_key) ? 'checked' : ''} onclick="toggleBatchItem('\${lic.license_key}', this.checked)">
+        </div>
+        
         <!-- Col 1: 基本信息 -->
         <div style="display:flex; align-items:center; gap:12px; min-width:0;">
           <div style="width:36px; height:36px; flex-shrink:0; background:#30363d; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:14px;">
@@ -853,7 +981,7 @@ export const adminHtml = `<!DOCTYPE html>
           <div style="min-width:0; overflow:hidden;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
               <span style="font-weight:600; font-size:13px; color:var(--text-bright); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${lic.user_name || '<span style="color:var(--text-main); font-style:italic">未指定用户</span>'}</span>
-              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('\${lic.license_key}','\${lic.user_name||""}')" title="修改用户备注">✏️</span>
+              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('\${lic.license_key}','\${lic.user_name || ""}')" title="修改用户备注">✏️</span>
               <span class="badge \${isRevoked ? 'badge-danger' : 'badge-success'}" style="transform: scale(0.85); transform-origin:left; margin-left:2px;">\${lic.status.toUpperCase()}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
@@ -886,249 +1014,427 @@ export const adminHtml = `<!DOCTYPE html>
         </div>
       </div>
     \`;
-  });
-
-  html +='</div>';
-  container.innerHTML = html;
-}
-
-// 搜索过滤
-function filterLocalList() {
-  const kw = document.getElementById('keywordSearch').value.toLowerCase();
-  const filtered = ALL_LICENSES.filter((l) =>
-    l.license_key.toLowerCase().includes(kw) ||
-    (l.user_name && l.user_name.toLowerCase().includes(kw))
-  );
-  renderCards(filtered);
-}
-
-// 生卡逻辑
-async function doGenerate() {
-  const btn = document.getElementById('btnDoGen');
-  const pId = document.getElementById('genProductId').value;
-  const uName = document.getElementById('genUserName').value;
-  const cnt = parseInt(document.getElementById('genCount').value);
-  const mD = parseInt(document.getElementById('genMaxDevices').value);
-  const dur = document.getElementById('genDuration').value;
-
-  btn.disabled = true; btn.innerText="⚡ 正在炼制激活码...";
-
-  try {
-    const res = await fetch('/api/v1/auth/admin/generate', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_id: pId, user_name: uName, count: cnt, max_devices: mD, duration_days: dur ? parseInt(dur) : null })
-    });
-    const data = await res.json();
-    if (data.success) {
-      document.getElementById('genResult').style.display='block';
-      document.getElementById('genOutput').innerText = data.keys.join('\\n');
-      renderCards([]); // 生卡后清空列表提示刷新
-    } else { showModal({ title: '错误', message: data.msg, type: 'alert' }); }
-  } catch (e) { showModal({ title: '通讯失败', message: e.message, type: 'alert' }); }
-  finally { btn.disabled = false; btn.innerText="✨ 立即制卡并激活订阅"; }
-}
-
-// API 交互函数
-async function toggleStatus(key, status) {
-  const isRestore = status ==='active';
-  const confirmed = await showModal({
-    title: isRestore ? '🔓 恢复使用' : '🔒 吊销卡密',
-    message: '确定要' + (isRestore ? '恢复' : '吊销') + '卡密[<span style="color:var(--accent)">' + key + '</span>]吗？',
-    confirmText: '确定',
-    danger: !isRestore
-  });
-  if (!confirmed) return;
-  const res = await fetch('/api/v1/auth/admin/licenses/status', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ license_key: key, status })
-  });
-  if ((await res.json()).success) loadLicenses();
-}
-
-async function deleteLic(key) {
-  const confirmed = await showModal({
-    title: '🗑️ 彻底停产',
-    message: '⚠️ 危险: 确定删除卡密[<span style="color:var(--danger)">' + key + '</span>]吗？此操作不可逆！',
-    confirmText: '确认删除',
-    danger: true
-  });
-  if (!confirmed) return;
-  const res = await fetch('/api/v1/auth/admin/licenses', {
-    method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ license_key: key })
-  });
-  if ((await res.json()).success) loadLicenses();
-}
-
-async function editUserName(key, cur) {
-  const res = await showModal({
-    title: '✏️ 修改用户备注',
-    inputs: [{ label: '用户名或内部备注', value: cur, placeholder: '输入新备注' }],
-    confirmText: '保存修改'
-  });
-  if (!res) return;
-  const n = res[0];
-  await fetch('/api/v1/auth/admin/licenses/user', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ license_key: key, user_name: n })
-  });
-  loadLicenses();
-}
-// 添加产品续费管理
-async function addSub(key) {
-  const res = await showModal({
-    title: '➕ 添加订阅或续费',
-    message: '正在为 <b>' + key + '</b> 配置权限。<br/><span style="color:var(--warning); font-size:12px;">注：如需清除误绑产品，请填入产品 ID 并将时长设为 0。</span>',
-    inputs: [
-      { label: '产品线标识 (Product ID)', value: 'smartmp', placeholder: '如 smartmp' },
-      { label: '续费时长 (天数)', value: '365', placeholder: '填 365 即加一年，填 0 清除，留空永久' }
-    ],
-    confirmText: '确认办理'
-  });
-  
-  if (!res) return;
-  const pId = res[0] ? res[0].trim() : '';
-  const dVal = res[1] ? res[1].trim() : '';
-  if (!pId) return;
-
-  let days = null;
-  if (dVal !=='') {
-    days = parseInt(dVal);
-    if (isNaN(days)) return showModal({ title: '错误', message: '天数必须是纯数字', type: 'alert' });
-  }
-
-  try {
-    const fRes = await fetch('/api/v1/auth/admin/subscriptions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
-      body: JSON.stringify({ license_key: key, product_id: pId, duration_days: days })
-    });
-    const data = await fRes.json();
-    
-    if (data.success) {
-      showModal({ 
-        title: data.deleted ? '✅ 清理成功' : '🎉 订阅成功', 
-        message: data.deleted ? data.msg : '到期日: ' + (data.expires_at || '永久有效'), 
-        type: 'alert' 
-      }).then(() => loadLicenses());
-    } else {
-      showModal({ title: '操作失败', message: data.msg, type: 'alert' });
-    }
-  } catch (e) {
-    showModal({ title: '发生错误', message: e.message, type: 'alert' });
-  }
-}
-
-function copyText(t) {
-  navigator.clipboard.writeText(t);
-  const btn = window.event?.currentTarget;
-  if (btn) {
-    const old = btn.innerText;
-    btn.innerText='✅';
-    setTimeout(() => { btn.innerText = old; }, 1000);
-  }
-}
-async function copyGenResult() {
-  const txt = document.getElementById('genOutput').innerText;
-  await navigator.clipboard.writeText(txt);
-  showModal({ title: '复制成功', message: '已将所有激活码存入剪贴板', type: 'alert' });
-}
-
-async function exportData() {
-  if (ALL_LICENSES.length === 0) return showModal({ title: '提示', message: '当前没有可导出的数据', type: 'alert' });
-  const dataStr = JSON.stringify(ALL_LICENSES, null, 2);
-  const blob = new Blob([dataStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download='hw-licenses-backup-' + Date.now() + '.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// 导出为适合 Excel 打开的 CSV 格式表格
-async function exportExcel() {
-  if (ALL_LICENSES.length === 0) return showModal({ title: '提示', message: '当前没有可导出的数据', type: 'alert' });
-
-  // 1. 构建 CSV 表头
-  let csvContent='激活码标识,绑定用户/备注,状态,设备配额,已分配设备,包含产品数,订阅详情摘要,创建时间\\n';
-
-  // 2. 遍历数据平铺降维
-  ALL_LICENSES.forEach(lic => {
-    // 处理可能包含逗号的字段，用引号包裹
-    const safeStr = (str) => '"' + (str ? String(str).replace(/"/g, '""') : '') + '"';
-    
-    // 合并订阅详情为一个易读的字符串
-    const subDigest = (lic.subscriptions || []).map(s => {
-      const expStr = s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '永久';
-      return '[' + s.product_id + ': ' + expStr + ']';
-    }).join(' | ');
-
-    const row = [
-      safeStr(lic.license_key),
-      safeStr(lic.user_name || '未配置'),
-      lic.status ==='revoked' ? '已吊销' : '活跃',
-      lic.max_devices,
-      lic.current_devices,
-      (lic.subscriptions || []).length,
-      safeStr(subDigest),
-      safeStr(new Date(lic.created_at).toLocaleString())
-    ];
-    csvContent += row.join(',') + '\\n';
-  });
-
-  // 3. 加上 UTF-8 BOM，防止 Windows 下 Excel 打开直接乱码
-  const blob = new Blob(['\\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download='hw-licenses-report-' + Date.now() + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-async function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  event.target.value = ''; // Reset input status
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      const jsonStr = e.target?.result;
-      const licenses = JSON.parse(jsonStr);
-      if (!Array.isArray(licenses)) throw new Error("文件格式错误：期望 JSON 数组");
-      
-      const confirmMsg = "即将导入 " + licenses.length + " 条数据，已存在的数据将会被融合覆盖。是否继续？";
-      const res = await showModal({ title: '批量导入确认', message: confirmMsg, type: 'confirm' });
-      if (!res) return;
-
-      const fRes = await fetch('/api/v1/auth/admin/licenses/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
-        body: JSON.stringify({ licenses })
       });
-      const data = await fRes.json();
-      
-      if (data.success) {
-        showModal({ title: '✅ 导入成功', message: data.msg, type: 'alert' }).then(() => loadLicenses());
-      } else {
-        showModal({ title: '❌ 导入失败', message: data.msg, type: 'alert' });
+
+      html += '</div>';
+
+      // 添加分页导航栏
+      if (totalItems > PAGE_SIZE) {
+        html += \`
+      <div class="pagination">
+        <button class="secondary" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>← 上一页</button>
+        <div class="page-info">第 <span style="color:var(--text-bright);font-weight:bold">\${currentPage}</span> / \${totalPages} 页 (共 \${totalItems} 条)</div>
+        <button class="secondary" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>下一页 →</button>
+      </div>
+    \`;
       }
-    } catch (err) {
-      showModal({ title: '解析错误', message: err.message || err, type: 'alert' });
+
+      container.innerHTML = html;
     }
-  };
-  reader.readAsText(file);
-}
+
+    // 分页跳转函数
+    function goToPage(page) {
+      currentPage = page;
+      // 获取当前的搜索状态，应用过滤并重新渲染当前页
+      const kw = document.getElementById('keywordSearch').value.toLowerCase();
+      if (kw) {
+        const filtered = ALL_LICENSES.filter((l) =>
+          l.license_key.toLowerCase().includes(kw) ||
+          (l.user_name && l.user_name.toLowerCase().includes(kw))
+        );
+        renderCards(filtered);
+      } else {
+        renderCards(ALL_LICENSES);
+      }
+      // 滚动回列表顶部
+      window.scrollTo({ top: document.getElementById('licListContainer').offsetTop - 60, behavior: 'smooth' });
+    }
+
+    // 搜索过滤
+    function filterLocalList() {
+      const kw = document.getElementById('keywordSearch').value.toLowerCase();
+      const filtered = ALL_LICENSES.filter((l) =>
+        l.license_key.toLowerCase().includes(kw) ||
+        (l.user_name && l.user_name.toLowerCase().includes(kw))
+      );
+      currentPage = 1; // 搜索条件改变时，重置回第一页
+      renderCards(filtered);
+    }
+
+    // 生卡逻辑
+    async function doGenerate() {
+      const btn = document.getElementById('btnDoGen');
+      const pId = document.getElementById('genProductId').value;
+      const uName = document.getElementById('genUserName').value;
+      const cnt = parseInt(document.getElementById('genCount').value);
+      const mD = parseInt(document.getElementById('genMaxDevices').value);
+      const dur = document.getElementById('genDuration').value;
+
+      btn.disabled = true; btn.innerText = "⚡ 正在炼制激活码...";
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/generate', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: pId, user_name: uName, count: cnt, max_devices: mD, duration_days: dur ? parseInt(dur) : null })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('genResult').style.display = 'block';
+          document.getElementById('genOutput').innerText = data.keys.join('\\n');
+          renderCards([]); // 生卡后清空列表提示刷新
+        } else { showModal({ title: '错误', message: data.msg, type: 'alert' }); }
+      } catch (e) { showModal({ title: '通讯失败', message: e.message, type: 'alert' }); }
+      finally { btn.disabled = false; btn.innerText = "✨ 立即制卡并激活订阅"; }
+    }
+
+    // API 交互函数
+    async function toggleStatus(key, status) {
+      const isRestore = status === 'active';
+      const confirmed = await showModal({
+        title: isRestore ? '🔓 恢复使用' : '🔒 吊销卡密',
+        message: '确定要' + (isRestore ? '恢复' : '吊销') + '卡密[<span style="color:var(--accent)">' + key + '</span>]吗？',
+        confirmText: '确定',
+        danger: !isRestore
+      });
+      if (!confirmed) return;
+      const res = await fetch('/api/v1/auth/admin/licenses/status', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: key, status })
+      });
+      if ((await res.json()).success) loadLicenses();
+    }
+
+    async function deleteLic(key) {
+      const confirmed = await showModal({
+        title: '🗑️ 彻底停产',
+        message: '⚠️ 危险: 确定删除卡密[<span style="color:var(--danger)">' + key + '</span>]吗？此操作不可逆！',
+        confirmText: '确认删除',
+        danger: true
+      });
+      if (!confirmed) return;
+      const res = await fetch('/api/v1/auth/admin/licenses', {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: key })
+      });
+      if ((await res.json()).success) loadLicenses();
+    }
+
+    async function editUserName(key, cur) {
+      const res = await showModal({
+        title: '✏️ 修改用户备注',
+        inputs: [{ label: '用户名或内部备注', value: cur, placeholder: '输入新备注' }],
+        confirmText: '保存修改'
+      });
+      if (!res) return;
+      const n = res[0];
+      await fetch('/api/v1/auth/admin/licenses/user', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: key, user_name: n })
+      });
+      loadLicenses();
+    }
+    // 添加产品续费管理
+    async function addSub(key) {
+      const res = await showModal({
+        title: '➕ 添加订阅或续费',
+        message: '正在为 <b>' + key + '</b> 配置权限。<br/><span style="color:var(--warning); font-size:12px;">注：如需清除误绑产品，请填入产品 ID 并将时长设为 0。</span>',
+        inputs: [
+          { label: '产品线标识 (Product ID)', value: 'smartmp', placeholder: '如 smartmp' },
+          { label: '续费时长 (天数)', value: '365', placeholder: '填 365 即加一年，填 0 清除，留空永久' }
+        ],
+        confirmText: '确认办理'
+      });
+
+      if (!res) return;
+      const pId = res[0] ? res[0].trim() : '';
+      const dVal = res[1] ? res[1].trim() : '';
+      if (!pId) return;
+
+      let days = null;
+      if (dVal !== '') {
+        days = parseInt(dVal);
+        if (isNaN(days)) return showModal({ title: '错误', message: '天数必须是纯数字', type: 'alert' });
+      }
+
+      try {
+        const fRes = await fetch('/api/v1/auth/admin/subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+          body: JSON.stringify({ license_key: key, product_id: pId, duration_days: days })
+        });
+        const data = await fRes.json();
+
+        if (data.success) {
+          showModal({
+            title: data.deleted ? '✅ 清理成功' : '🎉 订阅成功',
+            message: data.deleted ? data.msg : '到期日: ' + (data.expires_at || '永久有效'),
+            type: 'alert'
+          }).then(() => loadLicenses());
+        } else {
+          showModal({ title: '操作失败', message: data.msg, type: 'alert' });
+        }
+      } catch (e) {
+        showModal({ title: '发生错误', message: e.message, type: 'alert' });
+      }
+    }
+
+    function copyText(t) {
+      navigator.clipboard.writeText(t);
+      const btn = window.event?.currentTarget;
+      if (btn) {
+        const old = btn.innerText;
+        btn.innerText = '✅';
+        setTimeout(() => { btn.innerText = old; }, 1000);
+      }
+    }
+    async function copyGenResult() {
+      const txt = document.getElementById('genOutput').innerText;
+      await navigator.clipboard.writeText(txt);
+      showModal({ title: '复制成功', message: '已将所有激活码存入剪贴板', type: 'alert' });
+    }
+
+    async function exportData() {
+      if (ALL_LICENSES.length === 0) return showModal({ title: '提示', message: '当前没有可导出的数据', type: 'alert' });
+      const dataStr = JSON.stringify(ALL_LICENSES, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hw-licenses-backup-' + Date.now() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // 导出为适合 Excel 打开的 CSV 格式表格
+    async function exportExcel() {
+      if (ALL_LICENSES.length === 0) return showModal({ title: '提示', message: '当前没有可导出的数据', type: 'alert' });
+
+      // 1. 构建 CSV 表头
+      let csvContent = '激活码标识,绑定用户/备注,状态,设备配额,已分配设备,包含产品数,订阅详情摘要,创建时间\\n';
+
+      // 2. 遍历数据平铺降维
+      ALL_LICENSES.forEach(lic => {
+        // 处理可能包含逗号的字段，用引号包裹
+        const safeStr = (str) => '"' + (str ? String(str).replace(/"/g, '""') : '') + '"';
+
+        // 合并订阅详情为一个易读的字符串
+        const subDigest = (lic.subscriptions || []).map(s => {
+          const expStr = s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '永久';
+          return '[' + s.product_id + ': ' + expStr + ']';
+        }).join(' | ');
+
+        const row = [
+          safeStr(lic.license_key),
+          safeStr(lic.user_name || '未配置'),
+          lic.status === 'revoked' ? '已吊销' : '活跃',
+          lic.max_devices,
+          lic.current_devices,
+          (lic.subscriptions || []).length,
+          safeStr(subDigest),
+          safeStr(new Date(lic.created_at).toLocaleString())
+        ];
+        csvContent += row.join(',') + '\\n';
+      });
+
+      // 3. 加上 UTF-8 BOM，防止 Windows 下 Excel 打开直接乱码
+      const blob = new Blob(['\\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hw-licenses-report-' + Date.now() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      event.target.value = ''; // Reset input status
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const jsonStr = e.target?.result;
+          const licenses = JSON.parse(jsonStr);
+          if (!Array.isArray(licenses)) throw new Error("文件格式错误：期望 JSON 数组");
+
+          const confirmMsg = "即将导入 " + licenses.length + " 条数据，已存在的数据将会被融合覆盖。是否继续？";
+          const res = await showModal({ title: '批量导入确认', message: confirmMsg, type: 'confirm' });
+          if (!res) return;
+
+          const fRes = await fetch('/api/v1/auth/admin/licenses/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+            body: JSON.stringify({ licenses })
+          });
+          const data = await fRes.json();
+
+          if (data.success) {
+            showModal({ title: '✅ 导入成功', message: data.msg, type: 'alert' }).then(() => loadLicenses());
+          } else {
+            showModal({ title: '❌ 导入失败', message: data.msg, type: 'alert' });
+          }
+        } catch (err) {
+          showModal({ title: '解析错误', message: err.message || err, type: 'alert' });
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ==========================================
+    // 批量操作逻辑
+    // ==========================================
+    function updateBatchBar() {
+      const bar = document.getElementById('batchBar');
+      const countDisplay = document.getElementById('batchCountDisplay');
+      if (!bar || !countDisplay) return;
+      const count = SET_SELECTED_KEYS.size;
+      countDisplay.innerText = count + ' 项选中';
+      if (count > 0) {
+        bar.classList.add('active');
+      } else {
+        bar.classList.remove('active');
+      }
+    }
+
+    function toggleBatchItem(key, isChecked) {
+      if (isChecked) {
+        SET_SELECTED_KEYS.add(key);
+      } else {
+        SET_SELECTED_KEYS.delete(key);
+      }
+      updateBatchBar();
+    }
+
+    function toggleAllCheckboxes(checkboxElem) {
+      const isChecked = checkboxElem.checked;
+      document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+        if (isChecked) {
+          SET_SELECTED_KEYS.add(cb.value);
+        } else {
+          SET_SELECTED_KEYS.delete(cb.value);
+        }
+      });
+      updateBatchBar();
+    }
+
+    function clearBatchSelection() {
+      SET_SELECTED_KEYS.clear();
+      document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+      const headerCb = document.querySelector('.lic-header .custom-checkbox');
+      if (headerCb) headerCb.checked = false;
+      updateBatchBar();
+    }
+
+    async function executeBatch() {
+      const actionSelect = document.getElementById('batchActionSelect');
+      const action = actionSelect ? actionSelect.value : '';
+      if (!action) {
+        return showModal({ title: '提示', message: '请先选择需要执行的操作类型', type: 'alert' });
+      }
+
+      const keys = Array.from(SET_SELECTED_KEYS);
+      if (keys.length === 0) {
+        return showModal({ title: '提示', message: '请先勾选至少一张卡密', type: 'alert' });
+      }
+
+      // 纯前端操作：批量复制卡密
+      if (action === 'copy_keys') {
+        try {
+          await navigator.clipboard.writeText(keys.join('\\n'));
+          showModal({ title: '✅ 复制成功', message: '已将 ' + keys.length + ' 个激活码复制到剪贴板！' });
+          clearBatchSelection();
+        } catch (e) {
+          showModal({ title: '复制失败', message: '浏览器拒绝访问剪贴板，请手动处理', type: 'alert' });
+        }
+        return;
+      }
+
+      let params = {};
+      const optionText = actionSelect.options[actionSelect.selectedIndex].text.replace(/^[\\u0000-\\uFFFF]{1,3}\\s/, '');
+
+      // 需要额外参数的操作：弹窗收集
+      if (action === 'set_user_name') {
+        const u = await showModal({
+          title: '✏️ 批量设置备注',
+          message: '将 ' + keys.length + ' 个卡密的备注统一修改为：',
+          inputs: [{ label: '备注内容', placeholder: '如: 2026春季活动批次' }]
+        });
+        if (u === false) return;
+        params.user_name = u[0] || '';
+      } else if (action === 'set_max_devices') {
+        const d = await showModal({
+          title: '🔢 批量调整设备上限',
+          message: '为选中的 ' + keys.length + ' 个卡密设置新的最大设备数：',
+          inputs: [{ label: '设备数量', type: 'number', placeholder: '1-100', value: '2' }]
+        });
+        if (d === false) return;
+        params.max_devices = parseInt(d[0]);
+      } else if (action === 'add_subscription') {
+        const u = await showModal({
+          title: '🚀 批量续费 / 添加产品',
+          message: '为选中的 ' + keys.length + ' 个卡密统一添加指定产品权限：',
+          inputs: [
+            { label: '目标产品 ID', placeholder: '如: smartmp' },
+            { label: '有效天数', type: 'number', placeholder: '留空表示永久有效' }
+          ]
+        });
+        if (u === false) return;
+        params.product_id = u[0];
+        params.duration_days = u[1] ? parseInt(u[1]) : null;
+      } else if (action === 'remove_subscription') {
+        const u = await showModal({
+          title: '❌ 批量移除产品权限',
+          message: '从选中的卡密中剥夺指定产品的授权：',
+          danger: true,
+          inputs: [{ label: '要移除的产品 ID', placeholder: '如: smartmp' }]
+        });
+        if (u === false) return;
+        params.product_id = u[0];
+      } else {
+        // 无额外参数的操作（吊销/恢复/删除/解绑）
+        const isDanger = ['delete', 'revoke', 'unbind'].includes(action);
+        const confirmed = await showModal({
+          title: '⚠️ 批量操作确认',
+          message: '即将对 <strong style="color:var(--accent)">' + keys.length + '</strong> 个卡密执行 <b>' + optionText + '</b> 操作。确定继续？',
+          danger: isDanger,
+          confirmText: isDanger ? '确认执行' : '确定'
+        });
+        if (!confirmed) return;
+      }
+
+      // 调用后端 /batch 接口
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses/batch', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + ADMIN_SECRET,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ keys, action, params })
+        });
+        const data = await res.json();
+        if (data.success) {
+          clearBatchSelection();
+          showModal({ title: '✅ 执行成功', message: data.msg }).then ?
+            showModal({ title: '✅ 执行成功', message: data.msg }).then(() => loadLicenses()) :
+            (showModal({ title: '✅ 执行成功', message: data.msg }), loadLicenses());
+        } else {
+          showModal({ title: '❌ 批量操作失败', message: data.msg, type: 'alert' });
+        }
+      } catch (e) {
+        showModal({ title: '🌐 网络异常', message: e.message, type: 'alert' });
+      }
+    }
   </script>
 </body>
 

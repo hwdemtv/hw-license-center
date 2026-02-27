@@ -1,0 +1,55 @@
+wrangler
+
+COMMANDS
+  wrangler docs [search..]        📚 Open Wrangler's command documentation in your browser
+  wrangler complete [shell]       ⌨️ Generate and handle shell completions
+
+ACCOUNT
+  wrangler auth                   🔐 Manage authentication
+  wrangler login                  🔓 Login to Cloudflare
+  wrangler logout                 🚪 Logout from Cloudflare
+  wrangler whoami                 🕵️ Retrieve your user information
+
+COMPUTE & AI
+  wrangler ai                     🤖 Manage AI models
+  wrangler containers             📦 Manage Containers [open beta]
+  wrangler delete [name]          🗑️ Delete a Worker from Cloudflare
+  wrangler deploy [script]        🆙 Deploy a Worker to Cloudflare
+  wrangler deployments            🚢 List and view the current and past deployments for your Worker
+  wrangler dev [script]           👂 Start a local server for developing your Worker
+  wrangler dispatch-namespace     🏗️ Manage dispatch namespaces
+  wrangler init [name]            📥 Initialize a basic Worker
+  wrangler pages                  ⚡️ Configure Cloudflare Pages
+  wrangler queues                 📬 Manage Workers Queues
+  wrangler rollback [version-id]  🔙 Rollback a deployment for a Worker
+  wrangler secret                 🤫 Generate a secret that can be referenced in a Worker
+  wrangler setup                  🪄 Setup a project to work on Cloudflare [experimental]
+  wrangler tail [worker]          🦚 Start a log tailing session for a Worker
+  wrangler triggers               🎯 Updates the triggers of your current deployment [experimental]
+  wrangler types [path]           📝 Generate types from your Worker configuration
+  wrangler versions               🫧 List, view, upload and deploy Versions of your Worker to Cloudflare
+  wrangler vpc                    🌐 Manage VPC [open beta]
+  wrangler workflows              🔁 Manage Workflows
+
+STORAGE & DATABASES
+  wrangler d1                     🗄️ Manage Workers D1 databases
+  wrangler hyperdrive             🚀 Manage Hyperdrive databases
+  wrangler kv                     🗂️ Manage Workers KV Namespaces
+  wrangler pipelines              🚰 Manage Cloudflare Pipelines [open beta]
+  wrangler r2                     📦 Manage R2 buckets & objects
+  wrangler secrets-store          🔐 Manage the Secrets Store [open beta]
+  wrangler vectorize              🧮 Manage Vectorize indexes
+
+NETWORKING & SECURITY
+  wrangler cert                   🪪 Manage client mTLS certificates and CA certificate chains used for secured connections [open beta]
+  wrangler mtls-certificate       🪪 Manage certificates used for mTLS connections
+
+GLOBAL FLAGS
+  -c, --config    Path to Wrangler configuration file  [string]
+      --cwd       Run as if Wrangler was started in the specified directory instead of the current working directory  [string]
+  -e, --env       Environment to use for operations, and for selecting .env and .dev.vars files  [string]
+      --env-file  Path to an .env file to load - can be specified multiple times - values from earlier files are overridden by values in later files  [array]
+  -h, --help      Show help  [boolean]
+  -v, --version   Show version number  [boolean]
+
+Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
