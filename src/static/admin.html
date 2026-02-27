@@ -1002,7 +1002,10 @@
 
         <!-- Col 3: 设备占用 -->
         <div style="font-size:12px;">
-          <div style="color:var(--text-bright); margin-bottom:4px; font-weight:500;">${lic.current_devices} <span style="color:var(--text-main); font-weight:normal;">/ ${lic.max_devices} 台</span></div>
+          <div style="color:var(--text-bright); margin-bottom:4px; font-weight:500; display:flex; align-items:center; gap:6px;">
+            <span>${lic.current_devices} <span style="color:var(--text-main); font-weight:normal;">/ ${lic.max_devices} 台</span></span>
+            <span onclick="toggleDevicePanel('${lic.license_key}')" style="cursor:pointer; font-size:10px; background:#21262d; border:1px solid #30363d; padding:2px 4px; border-radius:4px; color:var(--text-main); hover:color:var(--text-bright);">🔍 详情</span>
+          </div>
           <div style="height:4px; width:100%; max-width:80px; background:#30363d; border-radius:2px; overflow:hidden;">
             <div style="width:${devicePct}%; height:100%; background:var(--accent);"></div>
           </div>
@@ -1016,6 +1019,8 @@
           <button class="danger" style="padding:4px 8px; font-size:12px;" onclick="deleteLic('${lic.license_key}')" title="彻底删除">🗑️</button>
         </div>
       </div>
+      <!-- 动态设备面板插槽 -->
+      <div id="devicePanel_${lic.license_key}" style="display:none; grid-column:1/-1; background:#0d1117; border-top:1px dashed #30363d; padding:12px 16px;"></div>
     `;
       });
 
@@ -1468,8 +1473,101 @@
         } else {
           showModal({ title: '❌ 批量操作失败', message: data.msg, type: 'alert' });
         }
-      } catch (e) {
-        showModal({ title: '🌐 网络异常', message: e.message, type: 'alert' });
+      } catch (err) {
+        showModal({ title: '网络错误', message: err.message || err, type: 'alert' });
+      }
+    }
+
+    // ==========================================
+    // 设备明细面板控制
+    // ==========================================
+    async function toggleDevicePanel(key) {
+      const panel = document.getElementById('devicePanel_' + key);
+      if (!panel) return;
+
+      // 如果当前是展开状态，则收起
+      if (panel.style.display === 'block') {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+        return;
+      }
+
+      panel.style.display = 'block';
+      panel.innerHTML = '<div style="color:var(--text-main); font-size:12px; text-align:center; padding:10px;">⏳ 正在加载设备记录...</div>';
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses/' + key + '/devices', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          panel.innerHTML = '<div style="color:var(--danger); font-size:12px;">❌ ' + data.msg + '</div>';
+          return;
+        }
+
+        const devices = data.data;
+        if (devices.length === 0) {
+          panel.innerHTML = '<div style="color:var(--text-main); font-size:12px; font-style:italic;">暂无绑定设备。</div>';
+          return;
+        }
+
+        let tableHtml = `
+          <table style="width:100%; background:#161b22; border-radius:6px; overflow:hidden; font-size:12px; margin:0; border:1px solid #30363d;">
+            <thead>
+              <tr style="background:#21262d; text-align:left;">
+                <th style="padding:6px 12px; font-weight:600;">设备名称</th>
+                <th style="padding:6px 12px; font-weight:600;">设备特征码 (Device ID)</th>
+                <th style="padding:6px 12px; font-weight:600;">最近在线时间</th>
+                <th style="padding:6px 12px; text-align:right; font-weight:600;">管理</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        devices.forEach(d => {
+          const lActive = d.last_active ? new Date(d.last_active + 'Z').toLocaleString() : '未知';
+          tableHtml += `
+            <tr style="border-top:1px solid #30363d;">
+              <td style="padding:6px 12px; color:var(--text-bright);">${d.device_name || '未命名设备'}</td>
+              <td style="padding:6px 12px; font-family:monospace; color:#8b949e;">${d.device_id}</td>
+              <td style="padding:6px 12px; color:#8b949e;">${lActive}</td>
+              <td style="padding:6px 12px; text-align:right;">
+                <button class="danger" style="padding:2px 8px; font-size:11px;" onclick="removeSingleDevice('${key}', '${d.device_id}')">强解</button>
+              </td>
+            </tr>
+          `;
+        });
+
+        tableHtml += '</tbody></table>';
+        panel.innerHTML = tableHtml;
+
+      } catch (err) {
+        panel.innerHTML = '<div style="color:var(--danger); font-size:12px;">❌ 无法存取设备数据</div>';
+      }
+    }
+
+    async function removeSingleDevice(key, deviceId) {
+      const confirmMsg = "确定要强制注销该设备吗？踢出后，该设备的客户端将失去授权网络。";
+      const confirmed = await showModal({ title: '⚠️ 强解确认', message: confirmMsg, danger: true });
+      if (!confirmed) return;
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses/' + key + '/devices/' + encodeURIComponent(deviceId), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+        if (data.success) {
+          // 不刷新全局，只重刷当前面板和局部额度，提升体验
+          toggleDevicePanel(key); // 收起
+          setTimeout(() => toggleDevicePanel(key), 300); // 重新打开
+          loadLicenses(); // 稍微静默重刷一次大列表更新额度数字
+        } else {
+          showModal({ title: '操作失败', message: data.msg, type: 'alert' });
+        }
+      } catch (err) {
+        showModal({ title: '网络错误', message: err.message, type: 'alert' });
       }
     }
   </script>

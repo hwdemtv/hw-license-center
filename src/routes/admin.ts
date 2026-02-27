@@ -103,6 +103,45 @@ app.get('/licenses', async (c) => {
   }
 });
 
+// API: (管理员) 获取特定卡密的绑定设备明细列表
+app.get('/licenses/:key/devices', async (c) => {
+  try {
+    const licenseKey = c.req.param('key');
+    if (!licenseKey) return c.json({ success: false, msg: '未提供卡密' }, 400);
+
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM Devices WHERE license_key = ? ORDER BY last_active DESC`
+    ).bind(licenseKey).all();
+
+    return c.json({ success: true, data: results });
+  } catch (error) {
+    console.error('获取设备列表出错', error);
+    return c.json({ success: false, msg: '获取设备明细失败' }, 500);
+  }
+});
+
+// API: (管理员) 单兵剔除/强行解绑特定设备
+app.delete('/licenses/:key/devices/:deviceId', async (c) => {
+  try {
+    const licenseKey = c.req.param('key');
+    const deviceId = c.req.param('deviceId');
+    if (!licenseKey || !deviceId) return c.json({ success: false, msg: '参数不全' }, 400);
+
+    const result = await c.env.DB.prepare(
+      `DELETE FROM Devices WHERE license_key = ? AND device_id = ?`
+    ).bind(licenseKey, deviceId).run();
+
+    if (result.meta?.changes > 0) {
+      return c.json({ success: true, msg: '该设备已被强制剔除' });
+    } else {
+      return c.json({ success: false, msg: '未找到该设备记录' }, 404);
+    }
+  } catch (error) {
+    console.error('单兵解绑失败', error);
+    return c.json({ success: false, msg: '解绑操作遇到错误' }, 500);
+  }
+});
+
 // API: (管理员) 修改卡密状态 (例如封禁、解封)
 app.post('/licenses/status', async (c) => {
   try {
