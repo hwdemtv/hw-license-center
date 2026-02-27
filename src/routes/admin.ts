@@ -621,4 +621,59 @@ app.post('/licenses/batch', async (c) => {
 });
 
 
+// ===================== 系统设置 API =====================
+
+// 读取全部配置
+app.get('/settings', async (c) => {
+  try {
+    const result = await c.env.DB.prepare('SELECT key, value, label, category FROM SystemConfig ORDER BY category, key').all();
+    // 密码字段不返回明文给前端
+    const settings = (result.results || []).map((r: any) => ({
+      ...r,
+      value: r.key === 'admin_password' ? (r.value ? '••••••••' : '') : r.value
+    }));
+    return c.json({ success: true, settings });
+  } catch (e: any) {
+    return c.json({ success: false, msg: '读取配置失败: ' + e.message }, 500);
+  }
+});
+
+// 批量更新配置
+app.put('/settings', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { updates, old_password } = body; // updates: { key: value, ... }
+
+    if (!updates || typeof updates !== 'object') {
+      return c.json({ success: false, msg: '参数格式错误' }, 400);
+    }
+
+    // 若修改密码，需校验旧密码
+    if ('admin_password' in updates && updates.admin_password) {
+      if (!old_password) {
+        return c.json({ success: false, msg: '修改密码必须提供旧密码' }, 400);
+      }
+      // 先从 DB 读取当前密码
+      const current = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('admin_password').first<{ value: string }>();
+      const currentPwd = current?.value || c.env.ADMIN_SECRET || '';
+      if (old_password !== currentPwd) {
+        return c.json({ success: false, msg: '旧密码验证失败' }, 403);
+      }
+    }
+
+    // 构建批量 UPSERT 语句
+    const stmts = Object.entries(updates).map(([key, value]) =>
+      c.env.DB.prepare('INSERT OR REPLACE INTO SystemConfig (key, value, label, category) VALUES (?, ?, (SELECT label FROM SystemConfig WHERE key = ?), (SELECT category FROM SystemConfig WHERE key = ?))').bind(key, String(value), key, key)
+    );
+
+    if (stmts.length > 0) {
+      await c.env.DB.batch(stmts);
+    }
+
+    return c.json({ success: true, msg: `已成功更新 ${stmts.length} 项配置` });
+  } catch (e: any) {
+    return c.json({ success: false, msg: '更新配置失败: ' + e.message }, 500);
+  }
+});
+
 export default app;

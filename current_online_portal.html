@@ -275,26 +275,6 @@
             display: flex;
             gap: 12px;
         }
-
-        .rule-tips {
-            margin-top: 24px;
-            padding: 16px;
-            background: rgba(88, 166, 255, 0.05);
-            border: 1px solid rgba(88, 166, 255, 0.1);
-            border-radius: 8px;
-            font-size: 12px;
-            color: var(--text-main);
-            line-height: 1.8;
-        }
-
-        .rule-tips-title {
-            color: var(--accent);
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
     </style>
 </head>
 
@@ -302,8 +282,8 @@
     <div class="container">
         <div class="card">
             <div class="icon">💻</div>
-            <h1>{{portal_title}}</h1>
-            <p class="desc">{{portal_subtitle}}</p>
+            <h1>设备解绑查询门户</h1>
+            <p class="desc">在线强制释出与卡密关联的失效或闲置物理设备</p>
 
             <div id="sysMsg" class="msg"></div>
 
@@ -319,184 +299,165 @@
             <button class="primary" id="btnQuery" onclick="queryDevices()">📡 检索配额状态</button>
 
             <div class="result-area" id="resultArea">
-                <div class="quota-info" style="margin-bottom: 8px;">
+                <div class="quota-info">
                     <span>设备配额使用情况</span>
                     <strong id="quotaText" style="color:var(--text-bright)">- / -</strong>
-                </div>
-                <div class="quota-info">
-                    <span>本月剩余解绑额度</span>
-                    <strong id="unbindQuotaText" style="color:var(--text-bright)">- 次</strong>
                 </div>
                 <div class="device-list" id="deviceList">
                     <!-- devices inject here -->
                 </div>
             </div>
-            <div class="rule-tips">
-                <div class="rule-tips-title">💡 温馨提示</div>
-                <div style="margin-bottom: 12px;">{{portal_tips}}</div>
-                <div
-                    style="border-top: 1px dashed rgba(88, 166, 255, 0.2); padding-top: 12px; margin-top: 12px; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 16px;">📞</span>
-                    <span style="color: var(--text-bright); font-weight: 500;">客服/联系方式：</span>
-                    <span style="color: var(--accent);">{{admin_contact}}</span>
-                </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="confirmOverlay">
+        <div class="modal">
+            <h3 class="modal-title">危险操作确认</h3>
+            <div class="modal-body" id="confirmMsg"></div>
+            <div class="modal-actions">
+                <button class="secondary"
+                    style="background:transparent; border:1px solid var(--border-color); color:var(--text-bright);"
+                    id="btnCancelConfirm">取消</button>
+                <button class="danger" id="btnOkConfirm">确定断开</button>
             </div>
         </div>
+    </div>
 
-        <div class="overlay" id="confirmOverlay">
-            <div class="modal">
-                <h3 class="modal-title">危险操作确认</h3>
-                <div class="modal-body" id="confirmMsg"></div>
-                <div class="modal-actions">
-                    <button class="secondary"
-                        style="background:transparent; border:1px solid var(--border-color); color:var(--text-bright);"
-                        id="btnCancelConfirm">取消</button>
-                    <button class="danger" id="btnOkConfirm">确定断开</button>
-                </div>
-            </div>
-        </div>
+    <script>
+        let currentKey = '';
 
-        <script>
-            let currentKey = '';
+        function formatLicenseKey(el) {
+            el.value = el.value.replace(/\s+/g, '').toUpperCase();
+            document.getElementById('btnClear').style.display = el.value ? 'block' : 'none';
+            document.getElementById('btnPaste').style.display = el.value ? 'none' : 'block';
+        }
 
-            function formatLicenseKey(el) {
-                el.value = el.value.replace(/\s+/g, '').toUpperCase();
-                document.getElementById('btnClear').style.display = el.value ? 'block' : 'none';
-                document.getElementById('btnPaste').style.display = el.value ? 'none' : 'block';
-            }
-
-            async function pasteKey() {
-                try {
-                    const text = await navigator.clipboard.readText();
-                    if (text) {
-                        const el = document.getElementById('licenseKey');
-                        el.value = text;
-                        formatLicenseKey(el);
-                        // 可选：直接触发查询
-                        // queryDevices();
-                    }
-                } catch (err) {
-                    showMsg('无法访问剪贴板权限，请长按手动粘贴');
+        async function pasteKey() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    const el = document.getElementById('licenseKey');
+                    el.value = text;
+                    formatLicenseKey(el);
+                    // 可选：直接触发查询
+                    // queryDevices();
                 }
+            } catch (err) {
+                showMsg('无法访问剪贴板权限，请长按手动粘贴');
             }
+        }
 
-            function clearKey() {
-                const el = document.getElementById('licenseKey');
-                el.value = '';
-                formatLicenseKey(el);
-                el.focus();
-                document.getElementById('resultArea').style.display = 'none';
-            }
+        function clearKey() {
+            const el = document.getElementById('licenseKey');
+            el.value = '';
+            formatLicenseKey(el);
+            el.focus();
+            document.getElementById('resultArea').style.display = 'none';
+        }
 
-            function showConfirm(msg) {
-                return new Promise(resolve => {
-                    const overlay = document.getElementById('confirmOverlay');
-                    const btnOk = document.getElementById('btnOkConfirm');
-                    const btnCancel = document.getElementById('btnCancelConfirm');
+        function showConfirm(msg) {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('confirmOverlay');
+                const btnOk = document.getElementById('btnOkConfirm');
+                const btnCancel = document.getElementById('btnCancelConfirm');
 
-                    document.getElementById('confirmMsg').innerText = msg;
-                    overlay.classList.add('active');
+                document.getElementById('confirmMsg').innerText = msg;
+                overlay.classList.add('active');
 
-                    const cleanup = () => {
-                        overlay.classList.remove('active');
-                        btnOk.onclick = null;
-                        btnCancel.onclick = null;
-                    };
+                const cleanup = () => {
+                    overlay.classList.remove('active');
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                };
 
-                    btnOk.onclick = () => { cleanup(); resolve(true); };
-                    btnCancel.onclick = () => { cleanup(); resolve(false); };
-                });
-            }
+                btnOk.onclick = () => { cleanup(); resolve(true); };
+                btnCancel.onclick = () => { cleanup(); resolve(false); };
+            });
+        }
 
-            function showMsg(text, type = 'error') {
-                const el = document.getElementById('sysMsg');
-                el.className = 'msg ' + type;
-                el.innerText = text;
-                setTimeout(() => { el.style.display = 'none'; el.className = 'msg'; }, 5000);
-            }
+        function showMsg(text, type = 'error') {
+            const el = document.getElementById('sysMsg');
+            el.className = 'msg ' + type;
+            el.innerText = text;
+            setTimeout(() => { el.style.display = 'none'; el.className = 'msg'; }, 5000);
+        }
 
-            async function queryDevices() {
-                const key = document.getElementById('licenseKey').value.trim();
-                if (!key) return showMsg('请您先输入有效的激活码凭证');
+        async function queryDevices() {
+            const key = document.getElementById('licenseKey').value.trim();
+            if (!key) return showMsg('请您先输入有效的激活码凭证');
 
-                const btn = document.getElementById('btnQuery');
-                btn.classList.add('loading');
-                btn.innerText = '正在检索节点数据...';
-                document.getElementById('resultArea').style.display = 'none';
+            const btn = document.getElementById('btnQuery');
+            btn.classList.add('loading');
+            btn.innerText = '正在检索节点数据...';
+            document.getElementById('resultArea').style.display = 'none';
 
-                try {
-                    const res = await fetch('/api/v1/auth/portal/devices?key=' + encodeURIComponent(key));
-                    const data = await res.json();
+            try {
+                const res = await fetch('/api/v1/auth/portal/devices?key=' + encodeURIComponent(key));
+                const data = await res.json();
 
-                    if (!data.success) {
-                        throw new Error(data.msg || (res.status === 429 ? '访问过于频繁，请防刷冷却后重试' : '检索失败，无法确认卡密有效性'));
-                    }
-
-                    currentKey = key;
-                    renderDevices(data);
-                } catch (err) {
-                    showMsg(err.message);
-                } finally {
-                    btn.classList.remove('loading');
-                    btn.innerText = '📡 检索配额状态';
-                }
-            }
-
-            function renderDevices(data) {
-                document.getElementById('resultArea').style.display = 'block';
-                let qColor = 'var(--text-bright)';
-                if (data.current_devices >= data.max_devices) qColor = 'var(--warning)';
-                document.getElementById('quotaText').innerHTML = '<span style="color:' + qColor + '">' + data.current_devices + '</span> / ' + data.max_devices + ' 台';
-
-                let uColor = data.remaining_unbinds > 0 ? 'var(--text-bright)' : 'var(--danger)';
-                document.getElementById('unbindQuotaText').innerHTML = '<span style="color:' + uColor + '">' + data.remaining_unbinds + '</span> 次';
-
-                const listEl = document.getElementById('deviceList');
-                if (data.devices.length === 0) {
-                    listEl.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-main); font-size:12px;">✅ 当前激活码名下无任何物理设备绑定记录，额度充足。<br/><br/>您可以在任意机器上直接使用该卡密！</div>';
-                    return;
+                if (!data.success) {
+                    throw new Error(data.msg || (res.status === 429 ? '访问过于频繁，请防刷冷却后重试' : '检索失败，无法确认卡密有效性'));
                 }
 
-                let html = '';
-                data.devices.forEach(d => {
-                    const date = new Date(d.last_active).toLocaleString();
-                    const btnHtml = data.remaining_unbinds > 0
-                        ? `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>`
-                        : `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0; opacity:0.5; cursor:not-allowed;" disabled title="本月剩余解绑次数已耗尽">次数耗尽</button>`;
-                    html += `<div class="device-item">
+                currentKey = key;
+                renderDevices(data);
+            } catch (err) {
+                showMsg(err.message);
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerText = '📡 检索配额状态';
+            }
+        }
+
+        function renderDevices(data) {
+            document.getElementById('resultArea').style.display = 'block';
+            let qColor = 'var(--text-bright)';
+            if (data.current_devices >= data.max_devices) qColor = 'var(--warning)';
+            document.getElementById('quotaText').innerHTML = '<span style="color:' + qColor + '">' + data.current_devices + '</span> / ' + data.max_devices + ' 台';
+
+            const listEl = document.getElementById('deviceList');
+            if (data.devices.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-main); font-size:12px;">✅ 当前激活码名下无任何物理设备绑定记录，额度充足。<br/><br/>您可以在任意机器上直接使用该卡密！</div>';
+                return;
+            }
+
+            let html = '';
+            data.devices.forEach(d => {
+                const date = new Date(d.last_active).toLocaleString();
+                html += `<div class="device-item">
                     <div style="min-width:0; margin-right:8px;">
                     <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${d.device_name}</div>
                     <div class="dev-time">最近使用: ${date}</div>
                     </div>
-                    ${btnHtml}
+                    <button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>
                         </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
+        async function unbindDevice(deviceId) {
+            const confirmed = await showConfirm('⚠️ 危险操作：\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！');
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch('/api/v1/auth/unbind', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ license_key: currentKey, device_id: deviceId })
                 });
-                listEl.innerHTML = html;
-            }
+                const data = await res.json();
 
-            async function unbindDevice(deviceId) {
-                const confirmed = await showConfirm('⚠️ 危险操作：\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！');
-                if (!confirmed) return;
-
-                try {
-                    const res = await fetch('/api/v1/auth/unbind', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ license_key: currentKey, device_id: deviceId })
-                    });
-                    const data = await res.json();
-
-                    if (!data.success) {
-                        throw new Error(data.msg || (res.status === 429 ? '解绑频率超限，防恶刷限制激活，请稍事休息。' : '解绑遇到异常拦截'));
-                    }
-
-                    showMsg('设备已成功断开链接并释出名额空间！', 'success');
-                    queryDevices(); // refresh the list to verify the vacancy
-                } catch (err) {
-                    showMsg(err.message);
+                if (!data.success) {
+                    throw new Error(data.msg || (res.status === 429 ? '解绑频率超限，防恶刷限制激活，请稍事休息。' : '解绑遇到异常拦截'));
                 }
+
+                showMsg('设备已成功断开链接并释出名额空间！', 'success');
+                queryDevices(); // refresh the list to verify the vacancy
+            } catch (err) {
+                showMsg(err.message);
             }
-        </script>
+        }
+    </script>
 </body>
 
 </html>

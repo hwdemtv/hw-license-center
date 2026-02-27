@@ -90,9 +90,14 @@ app.post('/verify', async (c) => {
     // --- 签发 JWT ---
     // 为了防止“时光机漏洞”，我们将服务端的标准时间签入 JWT。
     // 这里使用简单的 Base64 JSON 模拟 Token（实际项目中可替换为 `jsonwebtoken` 等库）。
-    // 将有效期设为 30 天，强制插件在此期间内必须联网刷一次 Token。
+    // 将有效期设为可配置天数，强制插件在此期间内必须联网刷一次 Token。
     // --- 签发真实的 JWT ---
-    const expTime = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+    let jwtDays = 30;
+    try {
+      const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('jwt_offline_days').first<{ value: string }>();
+      if (cfg?.value) jwtDays = parseInt(cfg.value) || 30;
+    } catch (_) { }
+    const expTime = Math.floor(Date.now() / 1000) + (jwtDays * 24 * 60 * 60);
     const safePayload = {
       license_key,
       device_id,
@@ -154,8 +159,12 @@ app.post('/unbind', async (c) => {
       unbindCount = 0;
     }
 
-    // 3. 额度校验 (默认每月 3 次)
-    const MAX_UNBIND_PER_MONTH = 3;
+    // 3. 额度校验 (从数据库读取，默认每月 3 次)
+    let MAX_UNBIND_PER_MONTH = 3;
+    try {
+      const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('max_unbind_per_month').first<{ value: string }>();
+      if (cfg?.value) MAX_UNBIND_PER_MONTH = parseInt(cfg.value) || 3;
+    } catch (_) { }
     if (unbindCount >= MAX_UNBIND_PER_MONTH) {
       return c.json({
         success: false,
@@ -230,8 +239,12 @@ app.get('/portal/devices', async (c) => {
       };
     });
 
-    // 计算剩余解绑额度 (默认上限 3)
-    const MAX_UNBIND_PER_MONTH = 3;
+    // 计算剩余解绑额度 (从数据库读取，默认上限 3)
+    let MAX_UNBIND_PER_MONTH = 3;
+    try {
+      const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('max_unbind_per_month').first<{ value: string }>();
+      if (cfg?.value) MAX_UNBIND_PER_MONTH = parseInt(cfg.value) || 3;
+    } catch (_) { }
     const now = new Date();
     const currentPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     let remainingUnbinds = MAX_UNBIND_PER_MONTH;

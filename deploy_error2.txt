@@ -1,0 +1,27 @@
+
+ 鉀咃笍 wrangler 4.67.0 (update available 4.69.0)
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+鈻?[WARNING] The module rule {"type":"Text","globs":["**/*.html"],"fallbacks":[]} does not have a fallback, the following rules will be ignored:
+
+   {"type":"Text","globs":["**/*.txt","**/*.html","**/*.sql"]} (DEFAULT)
+  
+  Add `fallthrough = true` to rule to allow next rule to be used or `fallthrough = false` to silence this warning
+
+
+
+X [ERROR] Build failed with 1 error:
+
+  X [ERROR] Could not resolve "module"
+  
+      src/db/adapter.ts:2:30:
+        2 鈹?import { createRequire } from 'module';
+          鈺?                              ~~~~~~~~
+  
+    The package "module" wasn't found on the file system but is built into node.
+    - Make sure to prefix the module name with "node:" or update your compatibility_date to 2024-09-23 or later.
+    
+  
+  
+
+
+馃  Logs were written to "C:\Users\hwdem\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-02-27_14-51-45_641.log"

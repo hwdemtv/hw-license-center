@@ -1,0 +1,16 @@
+
+ 鉀咃笍 wrangler 4.67.0 (update available 4.69.0)
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+X [ERROR] Invalid Routes:
+
+  km.hwdemtv.com/*:
+  Wildcard operators (*) are not allowed in Custom Domains
+  Paths are not allowed in Custom Domains
+  
+  kami.hwdemtv.com/*:
+  Wildcard operators (*) are not allowed in Custom Domains
+  Paths are not allowed in Custom Domains
+
+
+馃  Logs were written to "C:\Users\hwdem\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-02-27_14-47-08_615.log"

@@ -89,6 +89,23 @@ app.route('/api/v1/auth/admin', adminRoutes);
 
 // 挂载纯前端单页应用
 app.get('/admin', (c) => c.html(adminHtml));
-app.get('/portal', (c) => c.html(portalHtml));
+app.get('/portal', async (c) => {
+  let html = portalHtml;
+  try {
+    const configs = await c.env.DB.prepare("SELECT key, value FROM SystemConfig WHERE category = 'portal'").all();
+    const configMap = (configs.results || []).reduce((acc: any, cur: any) => {
+      acc[cur.key] = cur.value;
+      return acc;
+    }, {});
+
+    html = html.replace(/\{\{portal_title\}\}/g, configMap.portal_title || '设备解绑查询门户');
+    html = html.replace(/\{\{portal_subtitle\}\}/g, configMap.portal_subtitle || '在线强制释出与卡密关联的失效或闲置物理设置');
+    html = html.replace(/\{\{portal_tips\}\}/g, (configMap.portal_tips || '').replace(/\n/g, '<br/>'));
+    html = html.replace(/\{\{admin_contact\}\}/g, configMap.admin_contact || '请联系您的发卡方处理');
+  } catch (e) {
+    console.error('Portal dynamic render error:', e);
+  }
+  return c.html(html);
+});
 
 export default app;
