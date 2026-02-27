@@ -135,6 +135,19 @@
             color: white;
         }
 
+        button.btn-aux {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-bright);
+            padding: 4px 8px;
+            font-size: 12px;
+            width: auto;
+        }
+
+        button.btn-aux:hover {
+            background: var(--border-color);
+        }
+
         .result-area {
             margin-top: 24px;
             display: none;
@@ -206,6 +219,62 @@
             opacity: 0.6;
             pointer-events: none;
         }
+
+        /* Overlay and Modal */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 360px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.2s;
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        .overlay.active .modal {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0 0 12px 0;
+            color: white;
+        }
+
+        .modal-body {
+            font-size: 13px;
+            color: var(--text-main);
+            margin-bottom: 24px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
     </style>
 </head>
 
@@ -218,9 +287,14 @@
 
             <div id="sysMsg" class="msg"></div>
 
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
                 <input type="text" id="licenseKey" placeholder="输入完整的激活码凭证 (License Key)" autocomplete="off"
-                    spellcheck="false" />
+                    spellcheck="false" style="padding-right: 76px;" oninput="formatLicenseKey(this)" />
+                <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:4px;">
+                    <button class="secondary btn-aux" id="btnPaste" onclick="pasteKey()" title="一键粘贴">📋 粘贴</button>
+                    <button class="secondary btn-aux" id="btnClear" onclick="clearKey()" title="清空"
+                        style="display:none; color:var(--text-main);">✕</button>
+                </div>
             </div>
             <button class="primary" id="btnQuery" onclick="queryDevices()">📡 检索配额状态</button>
 
@@ -236,8 +310,70 @@
         </div>
     </div>
 
+    <div class="overlay" id="confirmOverlay">
+        <div class="modal">
+            <h3 class="modal-title">危险操作确认</h3>
+            <div class="modal-body" id="confirmMsg"></div>
+            <div class="modal-actions">
+                <button class="secondary"
+                    style="background:transparent; border:1px solid var(--border-color); color:var(--text-bright);"
+                    id="btnCancelConfirm">取消</button>
+                <button class="danger" id="btnOkConfirm">确定断开</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentKey = '';
+
+        function formatLicenseKey(el) {
+            el.value = el.value.replace(/\s+/g, '').toUpperCase();
+            document.getElementById('btnClear').style.display = el.value ? 'block' : 'none';
+            document.getElementById('btnPaste').style.display = el.value ? 'none' : 'block';
+        }
+
+        async function pasteKey() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    const el = document.getElementById('licenseKey');
+                    el.value = text;
+                    formatLicenseKey(el);
+                    // 可选：直接触发查询
+                    // queryDevices();
+                }
+            } catch (err) {
+                showMsg('无法访问剪贴板权限，请长按手动粘贴');
+            }
+        }
+
+        function clearKey() {
+            const el = document.getElementById('licenseKey');
+            el.value = '';
+            formatLicenseKey(el);
+            el.focus();
+            document.getElementById('resultArea').style.display = 'none';
+        }
+
+        function showConfirm(msg) {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('confirmOverlay');
+                const btnOk = document.getElementById('btnOkConfirm');
+                const btnCancel = document.getElementById('btnCancelConfirm');
+
+                document.getElementById('confirmMsg').innerText = msg;
+                overlay.classList.add('active');
+
+                const cleanup = () => {
+                    overlay.classList.remove('active');
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                };
+
+                btnOk.onclick = () => { cleanup(); resolve(true); };
+                btnCancel.onclick = () => { cleanup(); resolve(false); };
+            });
+        }
 
         function showMsg(text, type = 'error') {
             const el = document.getElementById('sysMsg');
@@ -288,19 +424,20 @@
             let html = '';
             data.devices.forEach(d => {
                 const date = new Date(d.last_active).toLocaleString();
-                html += '<div class="device-item">' +
-                    '<div style="min-width:0; margin-right:8px;">' +
-                    '<div class="dev-name" title="为了保护隐私，已掩盖部分名称">' + d.device_name + '</div>' +
-                    '<div class="dev-time">最近使用: ' + date + '</div>' +
-                    '</div>' +
-                    '<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice(\\'' + d.device_id + '\\')">断开授权</button>' +
-                        '</div>';
+                html += `<div class="device-item">
+                    <div style="min-width:0; margin-right:8px;">
+                    <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${d.device_name}</div>
+                    <div class="dev-time">最近使用: ${date}</div>
+                    </div>
+                    <button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>
+                        </div>`;
             });
             listEl.innerHTML = html;
         }
 
         async function unbindDevice(deviceId) {
-            if (!confirm('⚠️ 危险操作：\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！')) return;
+            const confirmed = await showConfirm('⚠️ 危险操作：\n您确定要将这台设备从该激活码名下强制踢出吗？该设备原有的所有内部授权将立刻断开！');
+            if (!confirmed) return;
 
             try {
                 const res = await fetch('/api/v1/auth/unbind', {
