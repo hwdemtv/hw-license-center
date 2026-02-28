@@ -3,16 +3,16 @@
 ## 1. 背景与目标
 当前系统仅依赖客户端生成的 `device_id` (UUID) 进行绑定。为防止用户手动清除缓存或伪造 UUID 绕过设备绑定限制，我们需要建立**服务端复合指纹校验**机制。
 
-## 2. 客户端改造 (Obsidian 插件)
+## 2. 客户端改造 (Client Application)
 在调用 `/verify` 接口时，需在 Payload 中新增 `fingerprint_raw` 对象。
 
 ### 建议采集维度
-- `platform`: 操作系统 (win32, darwin, linux)
-- `arch`: 架构 (x64, arm64)
+- `platform`: 操作系统 (win32, darwin, linux, android, ios)
+- `arch`: 架构 (x64, arm64, x86)
 - `hostname`: 机器名称（建议进行前 3 字符脱敏）
 - `cpu_cores`: CPU 逻辑核心数
 - `os_ver`: 操作系统版本号
-- `obsidian_ver`: Obsidian 软件版本
+- `app_ver`: 客户端软件版本号 (如 Obsidian 版本, 桌面应用版本等)
 
 ### 示例 Payload
 ```json
@@ -25,7 +25,7 @@
     "h": "LAP***",
     "c": 16,
     "ov": "10.0.19045",
-    "av": "1.5.3"
+    "av": "1.5.3"  // Application Version
   }
 }
 ```
@@ -59,4 +59,4 @@ function generateFingerprint(raw: Record<string, any>): string {
 ## 5. 安全建议
 - **不要采集 MAC 地址**：隐私风险极高且在新版 OS 中经常被随机化。
 - **脱敏处理**：`hostname` 仅保留前缀，`os_ver` 仅保留主版本号。
-- **容错处理**：允许 1-2 个维度的微小漂移（例如软件升级导致的 `obsidian_ver` 变化），不应直接判定为非法设备。
+- **容错处理**：允许 1-2 个维度的微小漂移（例如软件升级导致的 `app_ver` 变化），不应直接判定为非法设备。
