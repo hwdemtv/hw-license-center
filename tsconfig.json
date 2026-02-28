@@ -8,8 +8,11 @@
     "lib": [
       "ESNext"
     ],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "types": [
-      "@cloudflare/workers-types"
+      "@cloudflare/workers-types",
+      "node"
     ]
   }
 }

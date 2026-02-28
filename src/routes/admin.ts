@@ -316,11 +316,16 @@ app.post('/licenses/import', async (c) => {
       // 超长卡密跳过，防撑爆
       if (String(lic.license_key).length > 100) continue;
 
-      // 1. Upsert 到 Licenses 表 (使用 INSERT OR REPLACE)
+      // 1. Upsert 到 Licenses 表
       statements.push(
         c.env.DB.prepare(
-          `INSERT OR REPLACE INTO Licenses (license_key, product_id, max_devices, user_name, status, created_at)
-           VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))`
+          `INSERT INTO Licenses (license_key, product_id, max_devices, user_name, status, created_at)
+           VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+           ON CONFLICT(license_key) DO UPDATE SET
+             product_id = excluded.product_id,
+             max_devices = excluded.max_devices,
+             user_name = COALESCE(excluded.user_name, user_name),
+             status = excluded.status`
         ).bind(
           lic.license_key,
           lic.product_id || 'UNKNOWN',
@@ -331,18 +336,16 @@ app.post('/licenses/import', async (c) => {
         )
       );
 
-      // 2. 清理可能已存在的旧订阅
-      statements.push(
-        c.env.DB.prepare(`DELETE FROM Subscriptions WHERE license_key = ?`).bind(lic.license_key)
-      );
-
-      // 3. 插入新的订阅列表
-      if (Array.isArray(lic.subscriptions)) {
+      // 2. 更新订阅列表（仅当导入数据中包含有效的 subscriptions 字段时执行）
+      if (lic.subscriptions && Array.isArray(lic.subscriptions)) {
         for (const sub of lic.subscriptions) {
           if (!sub.product_id) continue;
           statements.push(
             c.env.DB.prepare(
-              `INSERT INTO Subscriptions (license_key, product_id, expires_at) VALUES (?, ?, ?)`
+              `INSERT INTO Subscriptions (license_key, product_id, expires_at) 
+               VALUES (?, ?, ?)
+               ON CONFLICT(license_key, product_id) DO UPDATE SET 
+               expires_at = excluded.expires_at`
             ).bind(lic.license_key, sub.product_id, sub.expires_at || null)
           );
         }
@@ -373,10 +376,6 @@ app.post('/licenses/import', async (c) => {
 // 1. 添加/续费产品订阅 (Upsert 逻辑：若已有则时间累加，若无则新建)
 app.post('/subscriptions', async (c) => {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (authHeader !== `Bearer \${ c.env.ADMIN_SECRET } `) {
-      return c.json({ success: false, msg: '无权访问' }, 401);
-    }
 
     const { license_key, product_id, duration_days } = await c.req.json();
     if (!license_key || !product_id) {
@@ -435,10 +434,6 @@ app.post('/subscriptions', async (c) => {
 // 2. 移除指定产品的订阅
 app.delete('/subscriptions', async (c) => {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (authHeader !== `Bearer \${ c.env.ADMIN_SECRET } `) {
-      return c.json({ success: false, msg: '无权访问' }, 401);
-    }
 
     const { license_key, product_id } = await c.req.json();
     const result = await c.env.DB.prepare(
