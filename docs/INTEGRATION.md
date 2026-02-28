@@ -136,3 +136,127 @@ Content-Type: application/json
 }
 ```
 解绑成功后，应同步清除客户端本地缓存的 Token 等越发鉴权信息。
+
+---
+
+## 五、AI 代理网关接入 (BFF AI Proxy)
+
+### 1. 架构说明
+
+互为卡密中心内置了一套 **AI 后端转发网关 (Backend for Frontend)**。客户端无需持有任何大模型 API Key，只需复用已激活时获得的 **JWT Token** 作为凭证，即可安全地通过本网关调用大模型服务。
+
+**核心流程：**
+```
+客户端 (ZenClean等)
+  │  携带 JWT Token
+  ▼
+hw-license-center 网关 (/api/v1/ai)
+  ├── 1. JWT 鉴权校验
+  ├── 2. 每日额度检查 & 跨日自动重置
+  ├── 3. 注入隐藏的 API Key，转发至大模型
+  ├── 4. SSE 流式透传响应
+  └── 5. 原子扣减当日已用额度
+```
+
+**安全优势：**
+- 客户端永远拿不到真正的大模型 API Key
+- 每个卡密有独立的每日调用额度上限
+- 管理员可随时在后台关闭网关总开关
+
+### 2. Chat Completions 请求
+
+本网关**完全兼容 OpenAI SDK 协议**，客户端只需替换 Base URL 和 Authorization：
+
+```http
+POST https://your-worker-domain.workers.dev/api/v1/ai/chat/completions
+Content-Type: application/json
+Authorization: Bearer <激活时获得的 JWT Token>
+
+{
+  "model": "glm-4-flash",
+  "messages": [
+    {"role": "system", "content": "你是一个有用的助手。"},
+    {"role": "user", "content": "你好，请介绍一下自己。"}
+  ],
+  "stream": true
+}
+```
+
+> **注意：** `model` 字段可省略，此时自动使用管理员在后台设置的默认模型。
+
+**成功响应（非流式）：**
+```json
+{
+  "id": "chatcmpl-xxx",
+  "object": "chat.completion",
+  "choices": [{ "message": { "role": "assistant", "content": "你好！..." } }]
+}
+```
+
+**成功响应（流式 SSE）：** 逐帧透传大模型的 `data: {...}` 事件流。
+
+**额度用尽响应 (429)：**
+```json
+{
+  "success": false,
+  "msg": "今日 AI 调用额度已用完 (50/50)，请明日再试",
+  "code": "QUOTA_EXCEEDED"
+}
+```
+
+响应头中会附带 `X-AI-Quota-Remaining` 字段，表示本次请求后的剩余额度。
+
+### 3. 查询剩余额度
+
+```http
+GET https://your-worker-domain.workers.dev/api/v1/ai/quota
+Authorization: Bearer <JWT Token>
+```
+
+**响应：**
+```json
+{
+  "success": true,
+  "quota": {
+    "daily_limit": 50,
+    "used_today": 12,
+    "remaining": 38
+  }
+}
+```
+
+### 4. Python 客户端代码示例
+
+由于网关完全兼容 OpenAI SDK，Python 客户端的改动极其简单：
+
+```python
+from openai import OpenAI
+
+# 只需替换两个参数
+client = OpenAI(
+    base_url="https://your-worker-domain.workers.dev/api/v1/ai",
+    api_key="<本地缓存的 JWT Token>",  # 直接用激活时拿到的 Token
+)
+
+response = client.chat.completions.create(
+    model="glm-4-flash",  # 可省略，默认使用后台配置
+    messages=[
+        {"role": "user", "content": "帮我分析一下系统里的垃圾文件"}
+    ],
+    stream=True,
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
+```
+
+### 5. 额度管理
+
+| 配置层级 | 说明 | 操作位置 |
+|----------|------|----------|
+| **全局默认** | 所有卡密共享的默认每日额度 | 后台 → ⚙️ 系统设置 → 🤖 大模型 AI 代理网关 |
+| **单卡专属** | 为VIP用户单独配置更高额度 | 后台 → 🛠️ 资产管理 → 勾选卡密 → 🤖 配置专属 AI 额度 |
+
+**优先级：** 单卡专属额度 > 全局默认额度。留空单卡配置则自动退化为全局值。
+
