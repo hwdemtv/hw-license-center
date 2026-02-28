@@ -941,6 +941,7 @@
         <option value="restore">🔓 批量恢复</option>
         <option value="delete">🗑️ 彻底删除</option>
         <option value="set_user_name">📝 修改备注</option>
+        <option value="set_offline_privilege">⚡ 配置专属离线特权</option>
         <option value="copy_keys">📋 复制纯卡密文本</option>
       </optgroup>
       <optgroup label="产品与订阅">
@@ -1377,9 +1378,12 @@
           </div>
         </div>
         
-        <!-- Col 2: 订阅标签 -->
+        <!-- Col 2: 订阅标签与特权 -->
         <div style="font-size:12px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
           ${subHtml}
+          ${lic.offline_days_override !== null && lic.offline_days_override !== undefined
+            ? `<span class="badge" style="background:#6c5ce7; color:white; font-weight:bold" title="单卡脱机特权">⚡ 离线: ${lic.offline_days_override}天</span>`
+            : ''}
           <span onclick="addSub('${lic.license_key}')" style="color:var(--accent); cursor:pointer; font-weight:500; font-size:11px; margin-left:4px; padding:2px 6px; background:var(--accent-glow); border-radius:4px;">+ 续费管理</span>
         </div>
 
@@ -2073,6 +2077,14 @@
         });
         if (!res) return;
         params.user_name = res[0] || '';
+      } else if (action === 'set_offline_privilege') {
+        const res = await showModal({
+          title: '配置专属离线特权',
+          inputs: [{ label: `给 ${keys.length} 张卡密设置离线天数 (留空还原全局，0代表禁离线)：`, value: '', type: 'number', placeholder: '如: 365' }],
+          confirmText: '确定应用'
+        });
+        if (!res) return;
+        params.offline_days_override = res[0] === '' ? '' : parseInt(res[0]);
       } else if (action === 'set_max_devices') {
         const res = await showModal({
           title: '修改设备上限',

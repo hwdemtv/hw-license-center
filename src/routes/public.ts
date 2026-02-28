@@ -22,7 +22,7 @@ app.post('/verify', async (c) => {
 
     // 1. 查询激活码是否有效（不再限制必须与请求产品的初始所属权一致，实现“一卡跑全产品”跨界）
     const { results: licenses } = await c.env.DB.prepare(
-      `SELECT * FROM Licenses WHERE license_key = ? `
+      `SELECT *, offline_days_override FROM Licenses WHERE license_key = ? `
     ).bind(license_key).all();
 
     if (licenses.length === 0) {
@@ -92,12 +92,22 @@ app.post('/verify', async (c) => {
     // 这里使用简单的 Base64 JSON 模拟 Token（实际项目中可替换为 `jsonwebtoken` 等库）。
     // 将有效期设为可配置天数，强制插件在此期间内必须联网刷一次 Token。
     // --- 签发真实的 JWT ---
-    let jwtDays = 30;
-    try {
-      const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('jwt_offline_days').first<{ value: string }>();
-      if (cfg?.value) jwtDays = parseInt(cfg.value) || 30;
-    } catch (_) { }
-    const expTime = Math.floor(Date.now() / 1000) + (jwtDays * 24 * 60 * 60);
+    let jwtDays = 30; // 全局默认控制
+    if (license.offline_days_override !== null && license.offline_days_override !== undefined) {
+      // 若设订单卡专属离线特权，优先采纳此天数
+      jwtDays = Number(license.offline_days_override);
+    } else {
+      // 未单独配置的走系统全局提取机制
+      try {
+        const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('jwt_offline_days').first<{ value: string }>();
+        if (cfg?.value) jwtDays = parseInt(cfg.value) || 30;
+      } catch (_) { }
+    }
+
+    // 如果专属天数配了0，过期时间就设为恰好满足验证当次的短期票据 (如1分钟内)
+    const expTime = jwtDays <= 0
+      ? Math.floor(Date.now() / 1000) + 60
+      : Math.floor(Date.now() / 1000) + (jwtDays * 24 * 60 * 60);
     const safePayload = {
       license_key,
       device_id,

@@ -478,7 +478,7 @@ app.post('/licenses/batch', async (c) => {
     }
 
     // 安全检查：仅允许白名单内置操作
-    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription'];
+    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege'];
     if (!validActions.includes(action)) {
       return c.json({ success: false, msg: '非法或尚未支持的批量操作指令' }, 400);
     }
@@ -597,6 +597,23 @@ app.post('/licenses/batch', async (c) => {
           );
         });
         successMsg = `已从 ${keys.length} 个卡密中移除 [${rmProductId}] 产品权限`;
+        break;
+      }
+
+      // 9. 批量设置专属离线特权
+      case 'set_offline_privilege': {
+        const overrideStr = params?.offline_days_override;
+        const limitDays = overrideStr === '' || overrideStr == null ? null : parseInt(overrideStr);
+        if (limitDays !== null && (isNaN(limitDays) || limitDays < 0)) {
+          return c.json({ success: false, msg: '离线特权天数配置非法（须为有效数值或空代表还原默认）' }, 400);
+        }
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET offline_days_override = ? WHERE license_key = ?`).bind(limitDays, key)
+          );
+        });
+        const dLabel = limitDays === null ? '还原为全局配置' : `强制 ${limitDays} 天内免联`;
+        successMsg = `已将 ${keys.length} 个卡密的离线特权修改为：${dLabel}`;
         break;
       }
 

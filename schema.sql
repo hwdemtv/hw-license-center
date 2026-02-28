@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS Licenses (
     user_name TEXT,                             -- 绑定的用户名或备注（可选）
     status TEXT NOT NULL DEFAULT 'active',      -- 'active', 'inactive', 'revoked'
     max_devices INTEGER NOT NULL DEFAULT 2,     -- 最大允许绑定设备数
+    offline_days_override INTEGER DEFAULT NULL, -- 单卡专属离线特权天数（优先级高于全局配置）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     activated_at DATETIME
 );
