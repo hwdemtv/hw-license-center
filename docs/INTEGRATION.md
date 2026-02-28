@@ -163,9 +163,9 @@ hw-license-center 网关 (/api/v1/ai)
 - 每个卡密有独立的每日调用额度上限
 - 管理员可随时在后台关闭网关总开关
 
-### 2. Chat Completions 请求
+### 2. Chat Completions 请求 (原生 HTTP)
 
-本网关**完全兼容 OpenAI SDK 协议**，客户端只需替换 Base URL 和 Authorization：
+本网关**完全兼容 OpenAI 标准协议**。如果您是直接发起原生 HTTP 请求（如使用 `fetch`、`requests`），请注意真实的完整端点路径包含 `/chat/completions` 后缀：
 
 ```http
 POST https://your-worker-domain.workers.dev/api/v1/ai/chat/completions
@@ -232,7 +232,9 @@ Authorization: Bearer <JWT Token>
 ```python
 from openai import OpenAI
 
-# 只需替换两个参数
+# ⚠️ 注意后缀的区别！对于 OpenAI 官方 SDK：
+# SDK 会自动在末尾帮你补全 "/chat/completions"
+# 所以这里的 base_url 只需要填到 "/ai" 即可，千万不要多写！
 client = OpenAI(
     base_url="https://your-worker-domain.workers.dev/api/v1/ai",
     api_key="<本地缓存的 JWT Token>",  # 直接用激活时拿到的 Token
