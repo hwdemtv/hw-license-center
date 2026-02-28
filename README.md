@@ -48,6 +48,7 @@
 | 分类 | 标题 | 说明 |
 |---|---|---|
 | **接入** | [🚀 开发者接入指南](./docs/INTEGRATION.md) | 包含 API 规范、JWT 校验与代码示例 |
+| **发卡** | [🔗 Webhook 对接指南](./docs/WEBHOOK_GUIDE.md) | 适配各发卡平台与支付平台的回调 |
 | **设备** | [🛡️ 设备指纹开发指南](./docs/device-fingerprint-guide.md) | 不同平台下如何抓取唯一硬件 ID |
 | **运维** | [🎯 双栖部署详尽指南](./docs/DUAL_DEPLOYMENT.md) | 深度适配 VPS 与 Cloudflare D1 的调优 |
 | **安全** | [🔐 安全策略与审计报告](./docs/SECURITY.md) | 包含 XSS、CORS 与限流器的加固详情 |
