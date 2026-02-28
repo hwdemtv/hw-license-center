@@ -373,7 +373,7 @@ app.post('/licenses/import', async (c) => {
 // API: (管理员) 一码多产品订阅管理 (Subscriptions)
 // ==========================================
 
-// 1. 添加/续费产品订阅 (Upsert 逻辑：若已有则时间累加，若无则新建)
+// 1. 添加/续费产品订阅 (逻辑已调整：0天删除，>0天设为从现在开始的绝对时长)
 app.post('/subscriptions', async (c) => {
   try {
 
@@ -387,33 +387,34 @@ app.post('/subscriptions', async (c) => {
       return c.json({ success: false, msg: '参数长度超出上限' }, 400);
     }
 
-    // 查询该卡密是否已存在此产品的订阅
-    const { results } = await c.env.DB.prepare(
-      `SELECT * FROM Subscriptions WHERE license_key = ? AND product_id = ? `
-    ).bind(license_key, product_id).all();
+    // --- 新增：0 天删除逻辑 ---
+    if (duration_days === 0) {
+      const result = await c.env.DB.prepare(
+        `DELETE FROM Subscriptions WHERE license_key = ? AND product_id = ? `
+      ).bind(license_key, product_id).run();
 
-    let newExpiresAt: string | null = null;
-    const now = new Date();
-
-    if (duration_days && typeof duration_days === 'number') {
-      if (results.length > 0 && results[0].expires_at) {
-        // 已有记录且非永久：在其原到期日和今天之间取较大者，再累加天数 (无缝续费)
-        const currentExp = new Date(results[0].expires_at as string);
-        const baseDate = currentExp > now ? currentExp : now;
-        baseDate.setDate(baseDate.getDate() + duration_days);
-        newExpiresAt = baseDate.toISOString();
-      } else if (results.length > 0 && !results[0].expires_at) {
-        // 已经是永久买断了，无需续费
-        return c.json({ success: false, msg: '该产品已经是永久有效，无需续费' }, 400);
+      if (result.meta.changes > 0) {
+        return c.json({ success: true, msg: '产品订阅已成功移除', deleted: true });
       } else {
-        // 全新订阅
-        now.setDate(now.getDate() + duration_days);
-        newExpiresAt = now.toISOString();
+        return c.json({ success: false, msg: '未找到该产品的订阅记录，无需删除' }, 404);
       }
     }
 
+    // --- 绝对时间设置逻辑 ---
+    let newExpiresAt: string | null = null;
+    if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
+      const now = new Date();
+      now.setDate(now.getDate() + duration_days);
+      newExpiresAt = now.toISOString();
+    }
+
+    // 检查是否存在
+    const { results } = await c.env.DB.prepare(
+      `SELECT 1 FROM Subscriptions WHERE license_key = ? AND product_id = ? `
+    ).bind(license_key, product_id).all();
+
     if (results.length > 0) {
-      // 执行 UPDATE (续期)
+      // 执行 UPDATE (覆盖现有到期日)
       await c.env.DB.prepare(
         `UPDATE Subscriptions SET expires_at = ? WHERE license_key = ? AND product_id = ? `
       ).bind(newExpiresAt, license_key, product_id).run();

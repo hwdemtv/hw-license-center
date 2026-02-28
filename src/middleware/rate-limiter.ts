@@ -9,25 +9,31 @@ export interface RateLimitConfig {
 // 内存存储：Worker 重启会清空，但不影响防刷大局
 const store = new Map<string, { count: number; resetTime: number }>();
 
-// 主动垃圾回收：在支持 Timer 的环境下（如 Node.js VPS）定时清理过期条目
-if (typeof setInterval !== 'undefined') {
-    setInterval(() => {
-        const now = Math.floor(Date.now() / 1000);
-        let cleaned = 0;
-        for (const [k, v] of store.entries()) {
-            if (v.resetTime < now) {
-                store.delete(k);
-                cleaned++;
-            }
-        }
-        if (cleaned > 0) {
-            console.log(`[RateLimiter] Active GC cleaned ${cleaned} expired records.`);
-        }
-    }, 60000); // 每 60 秒检查一次
-}
+let gcStarted = false;
 
 export const rateLimiter = (config: RateLimitConfig): MiddlewareHandler => {
     return async (c, next) => {
+        // 主动垃圾回收：仅在非 Worker 环境且未启动过的情况下，在请求处理函数（Handler Scope）内启动定时器
+        // 这样可以规避 Cloudflare Workers 对全局作用域异步操作的限制
+        if (!gcStarted && typeof globalThis !== 'undefined' && (globalThis as any).process && !(c.env as any).WORKER) {
+            if (typeof setInterval !== 'undefined') {
+                setInterval(() => {
+                    const now = Math.floor(Date.now() / 1000);
+                    let cleaned = 0;
+                    for (const [k, v] of store.entries()) {
+                        if (v.resetTime < now) {
+                            store.delete(k);
+                            cleaned++;
+                        }
+                    }
+                    if (cleaned > 0) {
+                        console.log(`[RateLimiter] Active GC cleaned ${cleaned} expired records.`);
+                    }
+                }, 60000);
+            }
+            gcStarted = true;
+        }
+
         // 默认按照 CF 的源 IP 进行限流
         const key = config.keyFn ? config.keyFn(c) : c.req.header('CF-Connecting-IP') || 'unknown-ip';
         const now = Math.floor(Date.now() / 1000);

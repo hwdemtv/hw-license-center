@@ -22,7 +22,7 @@
 
 **请求格式：**
 ```http
-POST https://hw-license-center.hwdemtv.workers.dev/api/v1/auth/verify
+POST https://your-worker-domain.workers.dev/api/v1/auth/verify
 Content-Type: application/json
 
 {
@@ -34,7 +34,7 @@ Content-Type: application/json
 ### 3. JavaScript / TypeScript 代码示例 (基础版)
 
 ```typescript
-const LICENSE_SERVER = "https://hw-license-center.hwdemtv.workers.dev";
+const LICENSE_SERVER = "https://your-worker-domain.workers.dev";
 const MY_PRODUCT_ID = "my-awesome-app"; // 你为当前软件设定的专有产品标识
 
 async function verifyLicense(key: string, deviceId: string) {
@@ -117,7 +117,7 @@ async function verifyLicense(key: string, deviceId: string) {
 
 **请求格式：**
 ```http
-POST https://hw-license-center.hwdemtv.workers.dev/api/v1/auth/unbind
+POST https://your-worker-domain.workers.dev/api/v1/auth/unbind
 Content-Type: application/json
 
 {
