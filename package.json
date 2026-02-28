@@ -20,13 +20,13 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260302.0",
+    "@cloudflare/workers-types": "^4.20260305.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.3.2",
     "@vitest/ui": "^4.0.18",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "vitest": "^4.0.18",
-    "wrangler": "^4.4.0"
+    "wrangler": "^4.69.0"
   }
 }

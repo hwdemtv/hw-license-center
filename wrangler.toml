@@ -1,25 +1,25 @@
 name = "hw-license-center"
 main = "src/index.ts"
-compatibility_date = "2024-04-03"
+compatibility_date = "2024-09-23"
 workers_dev = true
 compatibility_flags = [ "nodejs_compat" ]
 
 [[rules]]
 type = "Text"
-globs = ["**/*.html"]
-fallbacks = []
+globs = ["**/*.html", "**/*.sql"]
+fallthrough = true
 
 # Bindings for D1 Database
 [[d1_databases]]
-binding = "DB" # Available in your code as env.DB
+binding = "DB"
 database_name = "smart-mp-db"
-database_id = "beb9e90a-93b0-480e-aa84-c4d958052006" # Keep the existing ID unless resetting DB
+database_id = "beb9e90a-93b0-480e-aa84-c4d958052006"
 
-# Variables
 [vars]
 # 生产环境中已通过 wrangler secret 配置：
 # - ADMIN_SECRET (管理员后台登录密钥)
 # - JWT_SECRET (针对客户端 Token 的签名密钥)
+# - WEBHOOK_SECRET (Webhook 鉴权密钥)
 
 # 自定义域名路由（部署时自动同步到 Cloudflare）
 [[routes]]

@@ -1,13 +1,16 @@
 /// <reference types="node" />
+import * as path from 'path';
 
 // 同构数据库驱动适配器
 // 用运行时环境探测代替顶层模块依赖，防止 Cloudflare Worker 构建报错
 let betterSqlite3Promise: Promise<any> | null = null;
-if (typeof process !== 'undefined' && process.env) {
-    // 使用动态 import()，避免被打包器静态分析为必须的依赖（特别在 Cloudflare 环境下）
-    // 也能解决 ESM (Node.js/tsx) 下没有 require 的问题
-    betterSqlite3Promise = import('better-sqlite3').then(m => m.default || m).catch(e => {
-        console.error("Failed to dynamically import better-sqlite3:", e.message);
+
+// 针对 Cloudflare Workers 环境的打包隔离：
+// 1. 使用动态字符串避开 esbuild 的静态依赖扫描
+// 2. 检查 globalThis.process 确保只在 Node 环境尝试加载
+if (typeof globalThis !== 'undefined' && (globalThis as any).process && !(globalThis as any).process.env?.WORKER) {
+    const moduleName = 'better-sqlite3';
+    betterSqlite3Promise = import(moduleName).then(m => m.default || m).catch(e => {
         return null;
     });
 }

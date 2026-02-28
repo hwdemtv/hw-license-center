@@ -5,6 +5,7 @@ export interface Env {
     ALLOWED_ORIGINS?: string;
     WEBHOOK_SECRET?: string;
     NODE_ENV?: string;
+    [key: string]: any;
 }
 
 // 辅助函数：生成随机卡密，支持传入指定前缀

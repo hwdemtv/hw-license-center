@@ -45,3 +45,11 @@ INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) V
 -- 显式索引：加速 /verify 中的高频查询
 CREATE INDEX IF NOT EXISTS idx_devices_license_key ON Devices(license_key);
 CREATE INDEX IF NOT EXISTS idx_subs_license_key ON Subscriptions(license_key);
+
+-- 系统全局配置表 (Phase 17+)
+CREATE TABLE IF NOT EXISTS SystemConfig (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    label TEXT,
+    category TEXT
+);

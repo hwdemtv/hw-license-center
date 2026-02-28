@@ -901,6 +901,16 @@ export const adminHtml = `<!DOCTYPE html>
             </div>
           </div>
 
+          <!-- Webhook 发卡网关 -->
+          <div class="settings-card settings-group" style="grid-column: 1 / -1;">
+            <h3><span class="icon">🔗</span> Webhook 发卡网关回调配置</h3>
+            <div class="form-group">
+              <label>回调通信秘钥 (Webhook Secret)</label>
+              <input type="text" id="set_webhook_secret" placeholder="若为空则自动读取环境变量 WEBHOOK_SECRET">
+              <p class="help-text">用于自动发卡平台回调时的鉴权。配置后立即生效，直穿边缘节点进行验证。</p>
+            </div>
+          </div>
+
           <!-- 门户页面定制 -->
           <div class="settings-card settings-group portal-custom-group" style="grid-column: 1 / -1;">
             <h3><span class="icon">🎨</span> 门户品牌定制 (Portal Styling)</h3>
@@ -2286,7 +2296,7 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     async function saveSettings() {
-      const keys = ['jwt_offline_days', 'max_unbind_per_month', 'default_max_devices', 'expiry_warning_days', 'default_product_id', 'portal_title', 'portal_subtitle', 'portal_tips', 'admin_contact'];
+      const keys = ['jwt_offline_days', 'max_unbind_per_month', 'default_max_devices', 'expiry_warning_days', 'default_product_id', 'portal_title', 'portal_subtitle', 'portal_tips', 'admin_contact', 'webhook_secret'];
       const updates = {};
       keys.forEach(k => {
         const el = document.getElementById('set_' + k);
