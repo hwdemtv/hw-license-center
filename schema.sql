@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS Licenses (
     status TEXT NOT NULL DEFAULT 'active',      -- 'active', 'inactive', 'revoked'
     max_devices INTEGER NOT NULL DEFAULT 2,     -- 最大允许绑定设备数
     offline_days_override INTEGER DEFAULT NULL, -- 单卡专属离线特权天数（优先级高于全局配置）
+    risk_level INTEGER DEFAULT 0,               -- 风控等级（0=正常, 1=注意, 2=警告, 3=降权）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     activated_at DATETIME
 );
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS Devices (
     license_key TEXT NOT NULL,
     device_id TEXT NOT NULL,
     device_name TEXT,
+    fingerprint TEXT,                           -- 设备指纹哈希（Phase 22b 预留）
     last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(license_key) REFERENCES Licenses(license_key) ON DELETE CASCADE,
     UNIQUE(license_key, device_id)
@@ -39,3 +41,7 @@ INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) V
 INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('DEFAU-TEST-KEY-2', 'default', '李四', 'active', 2);
 INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('DEFAU-TEST-KEY-3', 'default', '黑名单用户', 'revoked', 2);
 INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('OTHER-TEST-KEY-1', 'othertool', '王五', 'active', 1);
+
+-- 显式索引：加速 /verify 中的高频查询
+CREATE INDEX IF NOT EXISTS idx_devices_license_key ON Devices(license_key);
+CREATE INDEX IF NOT EXISTS idx_subs_license_key ON Subscriptions(license_key);

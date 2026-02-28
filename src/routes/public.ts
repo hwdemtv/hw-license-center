@@ -81,6 +81,39 @@ app.post('/verify', async (c) => {
         return c.json({ success: false, msg: `激活失败。该激活码最多绑定 ${license.max_devices} 台设备。请先解绑其他设备。` }, 403);
       }
 
+      // --- Phase 22a: 24h 高频设备切换风控检测 ---
+      const riskLevel = license.risk_level || 0;
+
+      // 风控等级 ≥ 3 时，直接阻断新设备绑定
+      if (riskLevel >= 3) {
+        console.warn(`[RISK_BLOCK] 卡密 ${license_key} 风控等级=${riskLevel}，阻断新设备绑定: ${device_id}`);
+        return c.json({
+          success: false,
+          msg: '该激活码因异常行为已被限制绑定新设备，请联系管理员。',
+          code: 'RISK_BLOCKED'
+        }, 403);
+      }
+
+      // 检测 24h 内新设备绑定频次
+      try {
+        const recentBinds = await c.env.DB.prepare(
+          `SELECT COUNT(*) as cnt FROM Devices WHERE license_key = ? AND last_active >= datetime('now', '-24 hours')`
+        ).bind(license_key).first<{ cnt: number }>();
+
+        const recentCount = recentBinds?.cnt || 0;
+        if (recentCount >= 3) {
+          // 触发风控升级
+          const newRiskLevel = Math.min(riskLevel + 1, 5);
+          await c.env.DB.prepare(
+            `UPDATE Licenses SET risk_level = ? WHERE license_key = ?`
+          ).bind(newRiskLevel, license_key).run();
+          console.warn(`[RISK_ESCALATION] 卡密 ${license_key} 24h内绑定${recentCount}台新设备，风控升级: ${riskLevel} → ${newRiskLevel}`);
+        }
+      } catch (e) {
+        // 风控逻辑不应阻断正常业务流程
+        console.error('[RISK_CHECK_ERROR]', e);
+      }
+
       // 4. 新设备绑定
       await c.env.DB.prepare(
         `INSERT INTO Devices(license_key, device_id, device_name) VALUES(?, ?, ?)`

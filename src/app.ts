@@ -12,8 +12,15 @@ import { portalHtml } from './static/portalHtml';
 
 import { DBAdapter } from './db/adapter';
 import { trimTrailingSlash } from 'hono/trailing-slash';
+import { errorReporter } from './middleware/error-reporter';
 
-const app = new Hono<{ Bindings: Env }>({ strict: false });
+export const app = new Hono<{ Bindings: Env }>({ strict: false });
+
+// 1. 全局兜底错误拦截（最外层，捕获后续所有异常）
+app.use('*', errorReporter);
+
+// 2. 简易日志记录
+app.use('*', loggerMiddleware);
 
 // 移除末尾多余斜杠
 app.use('*', trimTrailingSlash());
@@ -28,7 +35,14 @@ app.use('*', async (c, next) => {
     Object.assign(c.env, process.env);
   }
 
+  // 核心同构钩子：拦截并在下文执行前将原生 DB 对象使用 DBAdapter 包裹包装。
+  // 若环境为 Cloudflare Workers，则代理调用；若为原生 Node.js，则在此注入本地 SQLite 实例，平层替换 c.env.DB。
+  if (c.env.DB && (c.env.DB as any).__isAdapter) {
+    return await next();
+  }
+
   c.env.DB = new DBAdapter(c.env.DB) as any;
+  (c.env.DB as any).__isAdapter = true;
   await next();
 });
 
@@ -43,8 +57,18 @@ app.use('/api/*', async (c, next) => {
       // 内部协议始终放行
       if (origin.startsWith('obsidian://') || origin.startsWith('app://')) return origin;
 
-      // 如果未配置白名单（开源默认态），放行任意来源以降低门槛
-      if (whitelist.length === 0) return origin;
+      // 如果未配置白名单（开源默认态），则根据环境决定是放行还是阻断
+      if (whitelist.length === 0) {
+        // 兼容 Cloudflare Workers 与本地 Node 环境的生产模式判定
+        const isProduction = c.env.NODE_ENV === 'production' ||
+          (!c.env.NODE_ENV && typeof process !== 'undefined' && (process as any).env.NODE_ENV === 'production');
+
+        if (isProduction) {
+          console.warn(`[CORS] 生产环境拦截未授权来源: ${origin}`);
+          return null; // 生产环境默认阻断所有跨域
+        }
+        return origin; // 开发环境保持极简放通
+      }
 
       // 如果配置了白名单，则严格匹配
       if (whitelist.includes(origin) || whitelist.includes('*')) return origin;

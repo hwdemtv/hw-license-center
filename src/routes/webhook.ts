@@ -3,11 +3,22 @@ import { Env, generateLicenseKey } from '../types';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Webhook 鉴权中间件
+// Webhook 鉴权中间件（密钥优先从 SystemConfig 动态获取，回退到 .env）
 app.use('/pay', async (c, next) => {
-    const secret = c.env.WEBHOOK_SECRET;
+    // 1. 优先尝试从 SystemConfig 获取最新密钥（支持热轮换）
+    let secret = '';
+    try {
+        const cfg = await c.env.DB.prepare(
+            "SELECT value FROM SystemConfig WHERE key = ?"
+        ).bind('webhook_secret').first<{ value: string }>();
+        if (cfg?.value) secret = cfg.value;
+    } catch (_) { }
+
+    // 2. 回退到环境变量（兼容未初始化 DB 的场景）
+    if (!secret) secret = c.env.WEBHOOK_SECRET || '';
+
     if (!secret) {
-        return c.json({ success: false, msg: '服务器未配置 Webhook 秘钥' }, 500);
+        return c.json({ success: false, msg: '服务器未配置 Webhook 秘钥（请在管理后台 SystemConfig 或 .env 中设置）' }, 500);
     }
 
     // 支持从 Header (Bearer) 或 Query 参数中获取 token
