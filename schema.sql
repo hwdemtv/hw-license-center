@@ -53,3 +53,19 @@ CREATE TABLE IF NOT EXISTS SystemConfig (
     label TEXT,
     category TEXT
 );
+
+-- ==========================================
+-- AI 代理网关扩展 (Phase 30: BFF AI Proxy)
+-- ==========================================
+
+-- 为 Licenses 表追加 AI 额度管理字段（生产环境使用 ALTER TABLE 逐列添加）
+-- ALTER TABLE Licenses ADD COLUMN ai_daily_quota INTEGER DEFAULT 20;
+-- ALTER TABLE Licenses ADD COLUMN ai_used_today INTEGER DEFAULT 0;
+-- ALTER TABLE Licenses ADD COLUMN ai_last_reset_date TEXT DEFAULT NULL;
+
+-- AI 系统全局配置初始值（首次部署时手动执行或通过后台 UI 设置）
+INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_api_base', 'https://api.hwdemtv.com/v1', 'AI 服务 Base URL', 'ai');
+INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_api_key', '', 'AI 接口秘钥 (API Key)', 'ai');
+INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_default_model', 'glm-4-flash', '默认模型名称', 'ai');
+INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_default_daily_quota', '50', '默认每日 AI 调用额度', 'ai');
+INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_enabled', 'true', 'AI 代理网关总开关', 'ai');

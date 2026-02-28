@@ -1,0 +1,15 @@
+
+ 鉀咃笍 wrangler 4.69.0
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+Total Upload: 265.83 KiB / gzip: 61.31 KiB
+Worker Startup Time: 16 ms
+Your Worker has access to the following bindings:
+Binding                   Resource         
+env.DB (smart-mp-db)      D1 Database      
+
+Uploaded hw-license-center (6.47 sec)
+Deployed hw-license-center triggers (5.06 sec)
+  https://hw-license-center.hwdemtv.workers.dev
+  km.hwdemtv.com (custom domain)
+  kami.hwdemtv.com (custom domain)
+Current Version ID: 4c8ace6f-1b43-4ee5-9df9-5412ef37a7f5

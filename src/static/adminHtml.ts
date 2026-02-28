@@ -911,6 +911,44 @@ export const adminHtml = `<!DOCTYPE html>
             </div>
           </div>
 
+          <!-- AI 大模型代理设置 -->
+          <div class="settings-card settings-group" style="grid-column: 1 / -1;">
+            <h3><span class="icon">🤖</span> 大模型 AI 代理网关</h3>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+              <div class="form-group">
+                <label>AI 服务 Base URL</label>
+                <input type="text" id="set_ai_api_base" placeholder="https://api.openai.com/v1">
+                <p class="help-text">兼容 OpenAI SDK 的大模型服务地址（不含 /chat/completions）。</p>
+              </div>
+              <div class="form-group">
+                <label>AI 接口秘钥 (API Key)</label>
+                <div class="pwd-input-wrapper">
+                  <input type="password" id="set_ai_api_key" placeholder="sk-...">
+                  <span class="pwd-toggle" onclick="const i=document.getElementById('set_ai_api_key');if(i.type==='password'){i.type='text';this.innerText='🙈'}else{i.type='password';this.innerText='👁️'}">👁️</span>
+                </div>
+                <p class="help-text">真实的大模型 API Key，仅存储在服务器数据库中，不会暴露给客户端。</p>
+              </div>
+              <div class="form-group">
+                <label>默认模型名称 (Model)</label>
+                <input type="text" id="set_ai_default_model" placeholder="glm-4-flash">
+                <p class="help-text">客户端未指定模型时使用的默认模型（如 glm-4-flash、gpt-4o-mini）。</p>
+              </div>
+              <div class="form-group">
+                <label>默认每日 AI 调用额度</label>
+                <input type="number" id="set_ai_default_daily_quota" placeholder="50">
+                <p class="help-text">未单独为卡密配置额度时，每个激活码每天的默认 AI 调用次数上限。</p>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+              <label>AI 代理网关总开关</label>
+              <select id="set_ai_enabled" style="width:auto; min-width:120px;">
+                <option value="true">✅ 已启用</option>
+                <option value="false">❌ 已关闭</option>
+              </select>
+              <p class="help-text">关闭后所有通过网关的 AI 请求将被拒绝。</p>
+            </div>
+          </div>
+
           <!-- 门户页面定制 -->
           <div class="settings-card settings-group portal-custom-group" style="grid-column: 1 / -1;">
             <h3><span class="icon">🎨</span> 门户品牌定制 (Portal Styling)</h3>
@@ -2296,7 +2334,7 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     async function saveSettings() {
-      const keys = ['jwt_offline_days', 'max_unbind_per_month', 'default_max_devices', 'expiry_warning_days', 'default_product_id', 'portal_title', 'portal_subtitle', 'portal_tips', 'admin_contact', 'webhook_secret'];
+      const keys = ['jwt_offline_days', 'max_unbind_per_month', 'default_max_devices', 'expiry_warning_days', 'default_product_id', 'portal_title', 'portal_subtitle', 'portal_tips', 'admin_contact', 'webhook_secret', 'ai_api_base', 'ai_api_key', 'ai_default_model', 'ai_default_daily_quota', 'ai_enabled'];
       const updates = {};
       keys.forEach(k => {
         const el = document.getElementById('set_' + k);

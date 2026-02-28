@@ -1,0 +1,21 @@
+
+ 鉀咃笍 wrangler 4.69.0
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+Total Upload: 265.60 KiB / gzip: 61.25 KiB
+Your Worker has access to the following bindings:
+Binding                   Resource         
+env.DB (smart-mp-db)      D1 Database      
+
+
+X [ERROR] A request to the Cloudflare API (/accounts/f67fadcdfb0fb9da04a8f2d54f6f3daa/workers/scripts/hw-license-center/versions) failed.
+
+  Uncaught Error: Disallowed operation called within global scope. Asynchronous I/O (ex: fetch() or connect()), setting a timeout, and generating random values are not allowed within global scope. To fix this error, perform this operation within a handler. https://developers.cloudflare.com/workers/runtime-apis/handlers/
+    at null.<anonymous> (file:///D:/Obsidian%E6%8F%92%E4%BB%B6/hw-license-center/src/middleware/rate-limiter.ts:14:5)
+   [code: 10021]
+  To learn more about this error, visit: https://developers.cloudflare.com/workers/observability/errors/#validation-errors-10021
+
+  
+  If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+
+
+馃  Logs were written to "C:\Users\hwdem\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-02-28_11-55-36_934.log"

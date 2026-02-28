@@ -7,6 +7,7 @@ import { rateLimiter } from './middleware/rate-limiter';
 import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
 import webhookRoutes from './routes/webhook';
+import aiProxyRoutes from './routes/ai_proxy';
 import { adminHtml } from './static/adminHtml';
 import { portalHtml } from './static/portalHtml';
 
@@ -110,6 +111,10 @@ app.use('/api/v1/auth/admin/*', adminAuthMiddleware);
 
 // 挂载后台所有 CRUD 管理接口
 app.route('/api/v1/auth/admin', adminRoutes);
+
+// AI 代理网关：限流 60 秒 10 次（防刷 AI 额度）
+app.use('/api/v1/ai/*', rateLimiter({ max: 10, window: 60 }));
+app.route('/api/v1/ai', aiProxyRoutes);
 
 // 挂载纯前端单页应用
 app.get('/admin', (c) => c.html(adminHtml));
