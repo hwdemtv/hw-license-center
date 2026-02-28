@@ -110,6 +110,23 @@ Cloudflare D1 Database (边缘 SQLite)
 
 ## 💡 常见问题
 
+### Q: 如何将旧的 VPS 部署升级以支持大模型 AI 网关？
+A: 如果您之前已经部署了旧版本，更新代码后除了 `npm install` 和 `npm run build:node`，您还需要为本地的 SQLite 数据库追加 AI 相关的字段：
+```bash
+# 登录服务器并进入数据库存放路径
+sqlite3 .wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite
+
+# 然后在 SQLite 交互行中按顺序执行以下升级语句：
+ALTER TABLE Licenses ADD COLUMN ai_daily_quota INTEGER DEFAULT NULL;
+ALTER TABLE Licenses ADD COLUMN ai_used_today INTEGER DEFAULT 0;
+ALTER TABLE Licenses ADD COLUMN ai_last_reset_date TEXT DEFAULT NULL;
+ALTER TABLE Licenses ADD COLUMN ai_model_override TEXT DEFAULT NULL;
+ALTER TABLE Licenses ADD COLUMN ai_key_override TEXT DEFAULT NULL;
+ALTER TABLE Licenses ADD COLUMN ai_base_override TEXT DEFAULT NULL;
+.quit
+```
+*新部署的用户直接执行 `sqlite3 ... < schema.sql` 即可，新版 SQL 内已包含全部结构及默认配置。*
+
 ### Q: 是否需要由于部署平台不同而修改代码？
 A: **不需要**。本项目已完成 `DBAdapter` 的抽象重构，系统启动时会自动识别环境并挂载对应的数据库驱动。
 
