@@ -1,4 +1,4 @@
-# Security Policy
+# Security Policy (v22+)
 
 ## Supported Versions
 
@@ -6,27 +6,39 @@ We are committed to resolving critical security issues in the active versions of
 
 | Version | Supported          |
 | ------- | ------------------ |
-| v1.x.x  | :white_check_mark: |
+| v22.x.x | :white_check_mark: |
+| v1.x.x  | :warning: (Legacy) |
+
+---
+
+## 🛡️ Core Security Mechanisms (Phase 26 Update)
+
+To protect the integrity of the license center, we have implemented multiple layers of defense:
+
+### 1. Cross-Site Scripting (XSS) Prevention
+We employ a **"Dual-Gate"** sanitization strategy for user-generated content (like device names):
+- **Server Side**: The `/portal/devices` API masks sensitive strings and neutralizes potential payloads before they leave the server.
+- **Client Side**: All dynamic DOM mounting in the admin and portal UI uses an `escapeHTML` utility to ensure data is rendered strictly as text, not as executable code.
+
+### 2. Rate Limiting & Memory Safety
+Our rate limiter middleware protects against brute-force attacks:
+- **Active Garbage Collection (GC)**: In Node.js environments, an automated 60s cleanup task proactively evicts expired records from memory, preventing denial-of-service (DoS) via memory exhaustion.
+- **Persistent Identification**: Rate limits are enforced based on connecting IPs (supporting Cloudflare headers).
+
+### 3. JWT Integrity
+- **HS256 Signing**: All tokens issued by the center are digitally signed.
+- **Clock Drift Tolerance**: Integrated time synchronization prevents valid tokens from being rejected due to minor server-client clock mismatches.
+
+---
 
 ## Reporting a Vulnerability
 
 We take the security of this project very seriously. If you discover a security vulnerability within `hw-license-center`, please do not publicly disclose it via GitHub Issues or public forums. 
 
-Instead, please send an e-mail directly to the project maintainers or use GitHub's private vulnerability reporting feature.
-
-**Please include the following information in your report:**
-- Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
-- Full paths of source file(s) related to the manifestation of the issue
-- The location of the affected source code (tag/branch/commit or direct URL)
-- Any special configuration required to reproduce the issue
-- Step-by-step instructions to reproduce the issue
-- Proof-of-concept or exploit code (if possible)
-- Impact of the issue, including how an attacker might exploit the issue
-
-We will endeavor to respond to your report within 48 hours and will keep you informed of our progress towards a resolution. Once the issue is resolved, we will publish a security advisory and notify users to update.
+Instead, please use GitHub's **Private Vulnerability Reporting** feature or contact the maintainers.
 
 ### Security Best Practices for Deployment
-- **Always modify the `ADMIN_SECRET`** before deploying to a production environment.
-- Use a strong, long, and unpredictable string for your `JWT_SECRET`.
-- Restrict `ALLOWED_ORIGINS` to your truly trusted frontend domains.
-- Ensure HTTPS is enforced on your Worker route/VPS domain.
+- **Modify `ADMIN_SECRET`**: Never use the default `hwdemtv` in production.
+- **Rotate `JWT_SECRET`**: We recommend rotating your signing key every 6-12 months.
+- **CORS Lockdown**: In production, the system automatically blocks unauthorized cross-origin requests unless explicitly whitelisted in `ALLOWED_ORIGINS`.
+- **Enforce HTTPS**: Cloudflare Workers enforce this by default; ensure your VPS Nginx config supports SSL.
