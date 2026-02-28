@@ -84,16 +84,13 @@ app.post('/chat/completions', async (c) => {
     if (!aiConfig.enabled) {
         return c.json({ success: false, msg: 'AI 服务暂未开放，请联系管理员' }, 503);
     }
-    if (!aiConfig.apiBase || !aiConfig.apiKey) {
-        return c.json({ success: false, msg: '管理员尚未配置 AI 服务参数' }, 503);
-    }
 
     // --- Step 3: 额度校验与跨日重置 ---
     const today = getTodayDateStr();
 
     // 查询该卡密是否存在且激活
     const license: any = await c.env.DB.prepare(
-        `SELECT license_key, status, ai_daily_quota, ai_used_today, ai_last_reset_date FROM Licenses WHERE license_key = ?`
+        `SELECT license_key, status, ai_daily_quota, ai_used_today, ai_last_reset_date, ai_model_override, ai_key_override, ai_base_override FROM Licenses WHERE license_key = ?`
     ).bind(licenseKey).first();
 
     if (!license) {
@@ -101,6 +98,15 @@ app.post('/chat/completions', async (c) => {
     }
     if (license.status === 'revoked') {
         return c.json({ success: false, msg: '该激活码已被停用' }, 403);
+    }
+
+    // 确定最终生效的 API 配置（单卡专属覆盖全局）
+    const activeApiBase = license.ai_base_override || aiConfig.apiBase;
+    const activeApiKey = license.ai_key_override || aiConfig.apiKey;
+    const activeModel = license.ai_model_override || aiConfig.defaultModel;
+
+    if (!activeApiBase || !activeApiKey) {
+        return c.json({ success: false, msg: '该激活码或系统尚未配置有效的 AI 服务参数' }, 503);
     }
 
     // 该用户的每日额度上限：有单卡配置则优先，否则退化为全局默认
@@ -134,17 +140,17 @@ app.post('/chat/completions', async (c) => {
 
     // 强制覆盖模型名（防止客户端恶意请求天价模型）
     if (!reqBody.model) {
-        reqBody.model = aiConfig.defaultModel;
+        reqBody.model = activeModel;
     }
 
-    const targetUrl = `${aiConfig.apiBase.replace(/\/+$/, '')}/chat/completions`;
+    const targetUrl = `${activeApiBase.replace(/\/+$/, '')}/chat/completions`;
 
     try {
         const upstreamRes = await fetch(targetUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${aiConfig.apiKey}`,
+                'Authorization': `Bearer ${activeApiKey}`,
             },
             body: JSON.stringify(reqBody),
         });

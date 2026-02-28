@@ -474,7 +474,7 @@ app.post('/licenses/batch', async (c) => {
     }
 
     // 安全检查：仅允许白名单内置操作
-    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege', 'set_ai_quota'];
+    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege', 'set_ai_quota', 'set_ai_model', 'set_ai_key', 'set_ai_base'];
     if (!validActions.includes(action)) {
       return c.json({ success: false, msg: '非法或尚未支持的批量操作指令' }, 400);
     }
@@ -627,6 +627,48 @@ app.post('/licenses/batch', async (c) => {
         });
         const qLabel = quota === null ? '还原为全局默认配置' : `每日 ${quota} 次`;
         successMsg = `已将 ${keys.length} 个卡密的 AI 专属额度修改为：${qLabel}`;
+        break;
+      }
+
+      // 11. 批量设置专属 AI 模型
+      case 'set_ai_model': {
+        const modelStr = params?.ai_model_override;
+        const model = modelStr === '' || modelStr == null ? null : String(modelStr);
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET ai_model_override = ? WHERE license_key = ?`).bind(model, key)
+          );
+        });
+        const label = model === null ? '还原为全局默认' : model;
+        successMsg = `已将 ${keys.length} 个卡密的专属 AI 模型修改为：${label}`;
+        break;
+      }
+
+      // 12. 批量设置专属 AI 接口秘钥
+      case 'set_ai_key': {
+        const keyStr = params?.ai_key_override;
+        const apiKey = keyStr === '' || keyStr == null ? null : String(keyStr);
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET ai_key_override = ? WHERE license_key = ?`).bind(apiKey, key)
+          );
+        });
+        const label = apiKey === null ? '还原为全局默认' : '已设定专属 Key (隐藏明文)';
+        successMsg = `已将 ${keys.length} 个卡密的专属 API Key 修改为：${label}`;
+        break;
+      }
+
+      // 13. 批量设置专属 AI 接口 Base URL
+      case 'set_ai_base': {
+        const baseStr = params?.ai_base_override;
+        const apiBase = baseStr === '' || baseStr == null ? null : String(baseStr);
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET ai_base_override = ? WHERE license_key = ?`).bind(apiBase, key)
+          );
+        });
+        const label = apiBase === null ? '还原为全局默认' : apiBase;
+        successMsg = `已将 ${keys.length} 个卡密的专属 Base URL 修改为：${label}`;
         break;
       }
 

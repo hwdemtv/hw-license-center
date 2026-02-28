@@ -1002,6 +1002,9 @@ export const adminHtml = `<!DOCTYPE html>
       </optgroup>
       <optgroup label="AI 管理">
         <option value="set_ai_quota">🤖 配置专属 AI 额度</option>
+        <option value="set_ai_model">🧠 配置专属 AI 模型</option>
+        <option value="set_ai_key">🔑 配置专属 API Key</option>
+        <option value="set_ai_base">🔗 配置专属 Base URL</option>
       </optgroup>
     </select>
     <button class="primary" style="padding:6px 16px" onclick="executeBatch()">🚀 确定执行</button>
@@ -2144,6 +2147,30 @@ export const adminHtml = `<!DOCTYPE html>
         });
         if (!res) return;
         params.ai_daily_quota = res[0] === '' ? '' : parseInt(res[0]);
+      } else if (action === 'set_ai_model') {
+        const res = await showModal({
+          title: '🧠 配置专属 AI 模型',
+          inputs: [{ label: \`给 \${keys.length} 张卡密绑定特权大模型名称 (留空还原全局默认)：\`, value: '', placeholder: '如: gpt-4o' }],
+          confirmText: '确定应用'
+        });
+        if (!res) return;
+        params.ai_model_override = res[0];
+      } else if (action === 'set_ai_key') {
+        const res = await showModal({
+          title: '🔑 配置专属 API Key',
+          inputs: [{ label: \`给 \${keys.length} 张卡密配置私人 API Key (留空还原全局默认)：\`, value: '', placeholder: 'sk-...' }],
+          confirmText: '确定应用'
+        });
+        if (!res) return;
+        params.ai_key_override = res[0];
+      } else if (action === 'set_ai_base') {
+        const res = await showModal({
+          title: '🔗 配置专属 Base URL',
+          inputs: [{ label: \`给 \${keys.length} 张卡密配置代理或专线接口 (留空还原全局默认)：\`, value: '', placeholder: 'https://api...' }],
+          confirmText: '确定应用'
+        });
+        if (!res) return;
+        params.ai_base_override = res[0];
       } else if (action === 'set_max_devices') {
         const res = await showModal({
           title: '修改设备上限',
