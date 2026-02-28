@@ -41,6 +41,21 @@
 
 ---
 
+## 📚 文档中心 (Documentation)
+
+为了方便开发者快速接入并了解系统底层设计，请参阅以下专项文档：
+
+| 分类 | 标题 | 说明 |
+|---|---|---|
+| **接入** | [🚀 开发者接入指南](./docs/INTEGRATION.md) | 包含 API 规范、JWT 校验与代码示例 |
+| **设备** | [🛡️ 设备指纹开发指南](./docs/device-fingerprint-guide.md) | 不同平台下如何抓取唯一硬件 ID |
+| **运维** | [🎯 双栖部署详尽指南](./docs/DUAL_DEPLOYMENT.md) | 深度适配 VPS 与 Cloudflare D1 的调优 |
+| **安全** | [🔐 安全策略与审计报告](./docs/SECURITY.md) | 包含 XSS、CORS 与限流器的加固详情 |
+| **回顾** | [📅 研发里程碑回顾](./docs/DEVELOPMENT_RETROSPECTIVE.md) | Phase 1-27 详尽研发历程总结 |
+| **展望** | [🛤️ 路线图与潜在风险](./docs/ROADMAP_AND_RISKS.md) | 技术债分析与中长期优化方向 |
+
+---
+
 ## 🚀 快速开始
 
 ### 情况 A：部署到 Cloudflare Workers (推荐)
