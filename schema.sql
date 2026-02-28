@@ -11,7 +11,14 @@ CREATE TABLE IF NOT EXISTS Licenses (
     offline_days_override INTEGER DEFAULT NULL, -- 单卡专属离线特权天数（优先级高于全局配置）
     risk_level INTEGER DEFAULT 0,               -- 风控等级（0=正常, 1=注意, 2=警告, 3=降权）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    activated_at DATETIME
+    activated_at DATETIME,
+    -- AI 代理网关专属配置 (Phase 30)
+    ai_daily_quota INTEGER DEFAULT NULL,        -- 专属每日额度上限
+    ai_used_today INTEGER DEFAULT 0,            -- 今日已用额度
+    ai_last_reset_date TEXT DEFAULT NULL,       -- 跨日重置凭证
+    ai_model_override TEXT DEFAULT NULL,        -- 专属越权模型名称
+    ai_key_override TEXT DEFAULT NULL,          -- 专属越权 API Key
+    ai_base_override TEXT DEFAULT NULL          -- 专属越权 Base URL
 );
 
 -- 产品订阅表（一码多产品）
@@ -57,11 +64,6 @@ CREATE TABLE IF NOT EXISTS SystemConfig (
 -- ==========================================
 -- AI 代理网关扩展 (Phase 30: BFF AI Proxy)
 -- ==========================================
-
--- 为 Licenses 表追加 AI 额度管理字段（生产环境使用 ALTER TABLE 逐列添加）
--- ALTER TABLE Licenses ADD COLUMN ai_daily_quota INTEGER DEFAULT 20;
--- ALTER TABLE Licenses ADD COLUMN ai_used_today INTEGER DEFAULT 0;
--- ALTER TABLE Licenses ADD COLUMN ai_last_reset_date TEXT DEFAULT NULL;
 
 -- AI 系统全局配置初始值（首次部署时手动执行或通过后台 UI 设置）
 INSERT OR IGNORE INTO SystemConfig (key, value, label, category) VALUES ('ai_api_base', 'https://api.hwdemtv.com/v1', 'AI 服务 Base URL', 'ai');
