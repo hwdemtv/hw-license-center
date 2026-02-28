@@ -20,14 +20,16 @@
 你需要从用户处获取**激活码 (License Key)**，并自动提取/生成**设备标识 (Device ID)**。
 设备标识可是：MAC地址、主板序列号，或首次运行生成的随机 UUID。
 
-**请求格式：**
+### 请求格式
+
 ```http
 POST https://your-worker-domain.workers.dev/api/v1/auth/verify
 Content-Type: application/json
 
 {
-  "license_key": "YOUR-USER-KEY",
-  "device_id": "DEVICE-UNIQUE-ID"
+  "license_key": "YOUR-LICENSE-KEY",
+  "device_id": "UNIQUE-HARDWARE-ID",
+  "device_name": "DESKTOP-PC-NAME" // 可选，建议上报如 platform.node() 获取的计算机名，方便在后台查看和管理
 }
 ```
 
@@ -96,14 +98,14 @@ async function verifyLicense(key: string, deviceId: string) {
 }
 ```
 
-### 1. 离线校验原理
-`data.token` 是一个由后端私钥签名的凭证，里面包含了解码信息：
-`{ "license_key": "xxx", "device_id": "xxx", "exp": 1700000000 }`。
+### 客户端响应处理与安全建议
 
-客户端不应该轻信 `data.success === true`，而是应当：
-1. **解密 Token** 验证数字签名是否正确（这意味着未被篡改）。
-2. **校验设备流形**，确保 `token` 中的 `device_id` 和本地电脑真实的一致（防止盗用有效 token 伪造请求）。
-3. **缓存 Token**（有效期 30 天左右），在断网/离线时，只要本地 Token 没有过期（`exp`），即可允许用户短时间免网络正常使用本软件。
+1.  **缓存 Token**：服务端返回的 `token` 是一段带有短期有效期的 JWT，仅包含核心身份信息（如 `license_key`, `device_id`, `exp` 等）。由于没有 Secret，客户端只需通过 base64 解析验证其 `exp`（是否在保活期内）和 `device_id`（防直接拷贝配置文件篡改）。
+2.  **区别双重失效期**
+    *   **临时保活期（JWT 的 `exp`）**：这是设备允许离线运行的最长宽限期（例如 30 天）。即使产品的包年权限还有十年，离线断网 30 天后也会强制要求联网刷新 Token。
+    *   **产品长期授权（`products[i].expires_at`）**：这是用户真正购买的产品到期时间（UI展示用）。客户端在联网激活成功时，应将本产品的 `expires_at` 和服务端的 `server_time` 随同 Token 一并落盘缓存，以便后续离线断网时也能向用户展示准确的总订阅到期日期。
+3.  **防倒推篡改**：不要在客户端写入任何硬编码的校验逻辑，只验证这枚缓存票据的有效性。建议客户端同时对比一次线上 NTP 时间或 API 刚返回的 `server_time`。
+4.  **一码通多产品**：您可以指定产品代码（如：`zenclean`）。`/verify` 返回的 `products` 数组内记录了各产品的到期日。通过过滤此数组对应的 `product_id` 及其 `status === 'active'` 即表示具备指定软件使用权限。
 
 ### 2. Node.js / Obsidian 防篡改示例
 
