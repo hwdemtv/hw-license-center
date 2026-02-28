@@ -52,7 +52,7 @@ app.post('/generate', async (c) => {
     if (error.message && error.message.includes('UNIQUE constraint failed')) {
       return c.json({ success: false, msg: '卡密生成冲突，请重试' }, 500);
     }
-    console.error('API Error:', error);
+    console.error('API Error:', error.message, error.stack);
     return c.json({ success: false, msg: '生成卡密时遇到内部错误' }, 500);
   }
 });

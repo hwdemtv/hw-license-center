@@ -2,14 +2,14 @@
 
 // 同构数据库驱动适配器
 // 用运行时环境探测代替顶层模块依赖，防止 Cloudflare Worker 构建报错
-let betterSqlite3: any = null;
+let betterSqlite3Promise: Promise<any> | null = null;
 if (typeof process !== 'undefined' && process.env) {
-    try {
-        // @ts-ignore
-        const req = require('module').createRequire(import.meta.url);
-        const driverName = 'better' + '-sqlite3';
-        betterSqlite3 = req(driverName);
-    } catch (_) { }
+    // 使用动态 import()，避免被打包器静态分析为必须的依赖（特别在 Cloudflare 环境下）
+    // 也能解决 ESM (Node.js/tsx) 下没有 require 的问题
+    betterSqlite3Promise = import('better-sqlite3').then(m => m.default || m).catch(e => {
+        console.error("Failed to dynamically import better-sqlite3:", e.message);
+        return null;
+    });
 }
 
 // 完全模拟 Cloudflare D1 API 签名，以对现有路由逻辑实现 0 侵入替换
@@ -31,26 +31,26 @@ export interface D1PreparedStatement {
     __sql?: string;
     __params?: any[];
     __isD1Stmt?: boolean;
-    __nativeDb?: any;
+    __nativeDbPromise?: Promise<any> | null;
 }
 
 export class DBAdapter {
     private d1Db: any = null;
-    private nativeDb: any = null;
+    private nativeDbPromise: Promise<any> | null = null;
 
     constructor(envDb?: any) {
         if (envDb && typeof envDb.prepare === 'function') {
             this.d1Db = envDb;
-        } else {
-            try {
-                const driverName = 'better' + '-sqlite3';
-                const Database = require(driverName);
-                // 使用相对路径寻找本地数据库 (与 Cloudflare 本地模拟路径一致或指定文件)
-                this.nativeDb = new Database('.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite', { fileMustExist: false });
-                this.nativeDb.pragma('journal_mode = WAL');
-            } catch (e) {
-                console.warn('⚠️ Unable to load better-sqlite3 natively. Ensure you have installed it for VPS deployment.');
-            }
+        } else if (betterSqlite3Promise) {
+            this.nativeDbPromise = betterSqlite3Promise.then(Database => {
+                if (!Database) {
+                    console.warn('⚠️ better-sqlite3 module not loaded dynamically. Ensure you have installed it for VPS deployment.');
+                    return null;
+                }
+                const db = new Database('.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite', { fileMustExist: false });
+                db.pragma('journal_mode = WAL');
+                return db;
+            });
         }
     }
 
@@ -73,22 +73,25 @@ export class DBAdapter {
                 return this;
             },
             async first<T = any>(colName?: string): Promise<T | null> {
-                if (!this.__nativeDb) throw new Error("No DB");
-                const stmt = this.__nativeDb.prepare(query);
+                const db = this.__nativeDbPromise ? await this.__nativeDbPromise : null;
+                if (!db) throw new Error("No DB");
+                const stmt = db.prepare(query);
                 const result = stmt.get(...boundParams);
                 if (!result) return null;
                 if (colName) return result[colName] ?? null;
                 return result;
             },
             async all<T = any>(): Promise<D1Result<T>> {
-                if (!this.__nativeDb) throw new Error("No DB");
-                const stmt = this.__nativeDb.prepare(query);
+                const db = this.__nativeDbPromise ? await this.__nativeDbPromise : null;
+                if (!db) throw new Error("No DB");
+                const stmt = db.prepare(query);
                 const results = stmt.all(...boundParams);
                 return { success: true, results, meta: { served_by: 'better-sqlite3' } };
             },
             async run<T = any>(): Promise<D1Result<T>> {
-                if (!this.__nativeDb) throw new Error("No DB");
-                const stmt = this.__nativeDb.prepare(query);
+                const db = this.__nativeDbPromise ? await this.__nativeDbPromise : null;
+                if (!db) throw new Error("No DB");
+                const stmt = db.prepare(query);
                 const info = stmt.run(...boundParams);
                 return { success: true, results: [], meta: { changes: info.changes, last_insert_row_id: info.lastInsertRowid } };
             },
@@ -96,8 +99,8 @@ export class DBAdapter {
                 throw new Error("raw() is not implemented in generic mock yet");
             }
         };
-        // 为了使 simulatedStmt 能读取 nativeDb
-        (simulatedStmt as any).__nativeDb = this.nativeDb;
+        // 为了使 simulatedStmt 能读取 nativeDbPromise
+        (simulatedStmt as any).__nativeDbPromise = this.nativeDbPromise;
 
         return simulatedStmt;
     }
@@ -106,15 +109,17 @@ export class DBAdapter {
         if (this.d1Db) {
             // Cloudflare 原生支持
             return await this.d1Db.batch(statements);
-        } else if (this.nativeDb) {
+        } else if (this.nativeDbPromise) {
+            const db = await this.nativeDbPromise;
+            if (!db) throw new Error("No database driver available");
             const results: D1Result<T>[] = [];
-            const runBatch = this.nativeDb.transaction(() => {
+            const runBatch = db.transaction(() => {
                 for (const stmt of statements) {
                     const sql = stmt.__sql;
                     const params = stmt.__params || [];
                     if (!sql) throw new Error("Invalid statement in batch");
 
-                    const nativeStmt = this.nativeDb.prepare(sql);
+                    const nativeStmt = db.prepare(sql);
                     // 判断语句类型：SELECT 用 all，其余使用 run
                     // 比较粗略的探查
                     const isSelect = sql.trim().toUpperCase().startsWith("SELECT");
@@ -137,8 +142,10 @@ export class DBAdapter {
     async exec(query: string): Promise<D1Result> {
         if (this.d1Db) {
             return await this.d1Db.exec(query);
-        } else if (this.nativeDb) {
-            this.nativeDb.exec(query);
+        } else if (this.nativeDbPromise) {
+            const db = await this.nativeDbPromise;
+            if (!db) throw new Error("No database driver available");
+            db.exec(query);
             return { success: true, results: [], meta: {} };
         }
         throw new Error("No database driver available");

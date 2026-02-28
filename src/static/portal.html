@@ -357,6 +357,16 @@
         </div>
 
         <script>
+            function escapeHTML(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
             let currentKey = '';
 
             function formatLicenseKey(el) {
@@ -460,12 +470,13 @@
                 let html = '';
                 data.devices.forEach(d => {
                     const date = new Date(d.last_active).toLocaleString();
+                    const safeDeviceName = escapeHTML(d.device_name);
                     const btnHtml = data.remaining_unbinds > 0
                         ? `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0;" onclick="unbindDevice('${d.device_id}')">断开授权</button>`
                         : `<button class="danger" style="width:auto; padding: 6px 12px; font-size: 12px; flex-shrink:0; opacity:0.5; cursor:not-allowed;" disabled title="本月剩余解绑次数已耗尽">次数耗尽</button>`;
                     html += `<div class="device-item">
                     <div style="min-width:0; margin-right:8px;">
-                    <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${d.device_name}</div>
+                    <div class="dev-name" title="为了保护隐私，已掩盖部分名称">${safeDeviceName}</div>
                     <div class="dev-time">最近使用: ${date}</div>
                     </div>
                     ${btnHtml}

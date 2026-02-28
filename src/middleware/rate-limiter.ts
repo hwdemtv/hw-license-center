@@ -15,6 +15,15 @@ export const rateLimiter = (config: RateLimitConfig): MiddlewareHandler => {
         const key = config.keyFn ? config.keyFn(c) : c.req.header('CF-Connecting-IP') || 'unknown-ip';
         const now = Math.floor(Date.now() / 1000);
 
+        // 惰性清理：防止恶意高并发导致的 Map 内存泄漏
+        if (store.size > 1000) {
+            for (const [k, v] of store.entries()) {
+                if (v.resetTime < now) {
+                    store.delete(k);
+                }
+            }
+        }
+
         let record = store.get(key);
 
         // 初始化或过期重置

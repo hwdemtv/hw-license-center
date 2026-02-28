@@ -958,10 +958,19 @@
   </div>
 
   <script>
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     let ADMIN_SECRET = "";
     let ALL_LICENSES = []; // 本地数据缓存
     let SET_SELECTED_KEYS = new Set(); // 批量选中的 keys
-
     // 分页状态
     let currentPage = 1;
     let PAGE_SIZE = 20;  // 每页显示条数
@@ -1357,8 +1366,8 @@
           </div>
           <div style="min-width:0; overflow:hidden;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-              <span style="font-weight:600; font-size:13px; color:var(--text-bright); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lic.user_name || '<span style="color:var(--text-main); font-style:italic">未指定用户</span>'}</span>
-              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('${lic.license_key}','${lic.user_name || ""}')" title="修改用户备注">✏️</span>
+              <span style="font-weight:600; font-size:13px; color:var(--text-bright); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${lic.user_name ? escapeHTML(lic.user_name) : '<span style="color:var(--text-main); font-style:italic">未指定用户</span>'}</span>
+              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('${lic.license_key}','${lic.user_name ? escapeHTML(lic.user_name.replace(/'/g, "\\'")) : ""}')" title="修改用户备注">✏️</span>
               <span class="badge ${isRevoked ? 'badge-danger' : 'badge-success'}" style="transform: scale(0.85); transform-origin:left; margin-left:2px;">${lic.status.toUpperCase()}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
@@ -2154,10 +2163,11 @@
         let html = `<div style="padding:8px 12px; font-size:12px;"><strong>共计 ${devices.length} 台在线设备：</strong></div>`;
         devices.forEach(d => {
           const lActive = d.last_active ? new Date(d.last_active + 'Z').toLocaleString('zh-CN') : '未知';
+          const safeDeviceName = escapeHTML(d.device_name || '未命名设备');
           html += `
             <div style="padding:8px 12px; border-top:1px solid #30363d; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="color:var(--text-bright); margin-bottom:4px;"><strong>${d.device_name || '未命名设备'}</strong></div>
+                <div style="color:var(--text-bright); margin-bottom:4px;"><strong>${safeDeviceName}</strong></div>
                 <div style="font-family:monospace; color:var(--text-main); margin-bottom:2px;">${d.device_id}</div>
                 <div style="color:var(--text-main); font-size:11px;">最后在线: ${lActive}</div>
               </div>
