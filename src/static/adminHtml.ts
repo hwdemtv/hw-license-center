@@ -1000,6 +1000,9 @@ export const adminHtml = `<!DOCTYPE html>
         <option value="unbind">📱 强制踢出设备</option>
         <option value="set_max_devices">🔢 修改上线额度</option>
       </optgroup>
+      <optgroup label="AI 管理">
+        <option value="set_ai_quota">🤖 配置专属 AI 额度</option>
+      </optgroup>
     </select>
     <button class="primary" style="padding:6px 16px" onclick="executeBatch()">🚀 确定执行</button>
     <button class="secondary" style="padding:6px 12px" onclick="selectAllFiltered()">☑️ 全选下方</button>
@@ -2133,6 +2136,14 @@ export const adminHtml = `<!DOCTYPE html>
         });
         if (!res) return;
         params.offline_days_override = res[0] === '' ? '' : parseInt(res[0]);
+      } else if (action === 'set_ai_quota') {
+        const res = await showModal({
+          title: '🤖 配置专属 AI 每日额度',
+          inputs: [{ label: \`给 \${keys.length} 张卡密设置 AI 每日调用次数 (留空还原为全局默认)：\`, value: '', type: 'number', placeholder: '如: 100' }],
+          confirmText: '确定应用'
+        });
+        if (!res) return;
+        params.ai_daily_quota = res[0] === '' ? '' : parseInt(res[0]);
       } else if (action === 'set_max_devices') {
         const res = await showModal({
           title: '修改设备上限',

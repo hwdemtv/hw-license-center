@@ -474,7 +474,7 @@ app.post('/licenses/batch', async (c) => {
     }
 
     // 安全检查：仅允许白名单内置操作
-    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege'];
+    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege', 'set_ai_quota'];
     if (!validActions.includes(action)) {
       return c.json({ success: false, msg: '非法或尚未支持的批量操作指令' }, 400);
     }
@@ -610,6 +610,23 @@ app.post('/licenses/batch', async (c) => {
         });
         const dLabel = limitDays === null ? '还原为全局配置' : `强制 ${limitDays} 天内免联`;
         successMsg = `已将 ${keys.length} 个卡密的离线特权修改为：${dLabel}`;
+        break;
+      }
+
+      // 10. 批量设置专属 AI 每日额度
+      case 'set_ai_quota': {
+        const quotaStr = params?.ai_daily_quota;
+        const quota = quotaStr === '' || quotaStr == null ? null : parseInt(quotaStr);
+        if (quota !== null && (isNaN(quota) || quota < 0)) {
+          return c.json({ success: false, msg: 'AI 额度须为非负数值，或留空还原为全局默认' }, 400);
+        }
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET ai_daily_quota = ? WHERE license_key = ?`).bind(quota, key)
+          );
+        });
+        const qLabel = quota === null ? '还原为全局默认配置' : `每日 ${quota} 次`;
+        successMsg = `已将 ${keys.length} 个卡密的 AI 专属额度修改为：${qLabel}`;
         break;
       }
 
