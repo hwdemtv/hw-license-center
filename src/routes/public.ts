@@ -6,7 +6,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.post('/verify', async (c) => {
   try {
-    const { license_key, device_id, device_name, product_id } = await c.req.json();
+    const { license_key, device_id, device_name, product_id, mode = 'active' } = await c.req.json();
 
     if (!license_key || !device_id) {
       return c.json({ success: false, msg: '缺少激活码或设备标识' }, 400);
@@ -54,7 +54,7 @@ app.post('/verify', async (c) => {
     });
 
     // 如果没有任何有效订阅（虽然罕见），或者当前请求的特定 product_id 已明确过期，
-    // 也能在这做强拦截。但为保持通用性，我们统一返回所有 products，由插件判定具体权限。
+    // 能在这做强拦截。但为保持通用性，我们统一返回所有 products，由插件判定具体权限。
 
     if (license.status === 'inactive') {
       // 首次激活，更新状态
@@ -76,6 +76,15 @@ app.post('/verify', async (c) => {
         `UPDATE Devices SET last_active = CURRENT_TIMESTAMP, device_name = ? WHERE license_key = ? AND device_id = ?`
       ).bind(device_name ? safeDeviceName : currentDevice.device_name, license_key, device_id).run();
     } else {
+      // --- 关键改进：如果是后台静默探活，严禁自动重绑 ---
+      if (mode === 'silent') {
+        return c.json({
+          success: false,
+          msg: '该设备已被管理员解绑，请重新执行手动激活流程。',
+          code: 'DEVICE_UNBOUND'
+        }, 403);
+      }
+
       // 3. 拦截：如果是新设备且达到数量上限
       if (devices.length >= license.max_devices) {
         return c.json({ success: false, msg: `激活失败。该激活码最多绑定 ${license.max_devices} 台设备。请先解绑其他设备。` }, 403);
