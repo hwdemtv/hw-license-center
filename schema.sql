@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS Licenses (
     max_devices INTEGER NOT NULL DEFAULT 2,     -- 最大允许绑定设备数
     offline_days_override INTEGER DEFAULT NULL, -- 单卡专属离线特权天数（优先级高于全局配置）
     risk_level INTEGER DEFAULT 0,               -- 风控等级（0=正常, 1=注意, 2=警告, 3=降权）
+    risk_threshold INTEGER DEFAULT NULL,        -- 24h绑定阈值（NULL=自动计算，否则使用此值）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     activated_at DATETIME,
     -- AI 代理网关专属配置 (Phase 30)
@@ -59,6 +60,20 @@ CREATE TABLE IF NOT EXISTS SystemConfig (
     value TEXT,
     label TEXT,
     category TEXT
+);
+
+-- 全域精准广播通知表
+CREATE TABLE IF NOT EXISTS Notifications (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    action_url TEXT,
+    type TEXT NOT NULL DEFAULT 'info',    -- 'update', 'info', 'warning'
+    status TEXT NOT NULL DEFAULT 'draft', -- 'draft', 'published', 'offline'
+    target_rules TEXT,                    -- 保留字段：千人千面分发规则(JSON字符串)
+    is_force INTEGER DEFAULT 0,           -- 是否强提醒 (1=是, 0=否)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================

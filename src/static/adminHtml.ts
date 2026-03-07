@@ -19,6 +19,8 @@ export const adminHtml = `<!DOCTYPE html>
       --warning: #d29922;
       --danger: #f85149;
       --indigo: #5385ff;
+      --header-h: 290px; /* 初始占位 */
+      --tools-h: 120px; /* 初始占位 */
     }
 
     body {
@@ -32,7 +34,24 @@ export const adminHtml = `<!DOCTYPE html>
     .container {
       max-width: 1100px;
       margin: 0 auto;
-      padding: 40px 20px;
+      padding: 0 20px 40px 20px;
+    }
+
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: var(--bg-color);
+      padding-top: 40px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    /* 当开始滚动时，增加底部分割线以显出层次感 */
+    .sticky-header.scrolled {
+       border-bottom-color: var(--border-color);
+       box-shadow: 0 10px 20px rgba(0,0,0,0.3);
     }
 
     /* Header & Stats */
@@ -62,6 +81,16 @@ export const adminHtml = `<!DOCTYPE html>
       margin-bottom: 24px;
     }
 
+    .sticky-tools {
+      position: sticky;
+      top: var(--header-h); /* 动态占位 */
+      z-index: 180;
+      background: var(--bg-color);
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 0;
+    }
+
     .stat-card {
       background: var(--panel-bg);
       border: 1px solid var(--border-color);
@@ -87,8 +116,10 @@ export const adminHtml = `<!DOCTYPE html>
     .tabs {
       display: flex;
       gap: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 10px;
       border-bottom: 1px solid var(--border-color);
+      background: var(--bg-color);
+      padding-top: 10px;
     }
 
     .tab {
@@ -669,47 +700,50 @@ export const adminHtml = `<!DOCTYPE html>
   </div>
 
   <div class="container">
-    <div class="header">
-      <div class="header-title">
-        <div style="background:var(--indigo); padding:8px; border-radius:8px; display:flex;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+    <div class="sticky-header" id="stickyHeader">
+      <div class="header">
+        <div class="header-title">
+          <div style="background:var(--indigo); padding:8px; border-radius:8px; display:flex;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <h1> 互为卡密中心 </h1>
         </div>
-        <h1> 互为卡密中心 </h1>
+        <div style="display:flex; gap:8px;">
+          <button class="secondary" onclick="loadLicenses()">🔄 刷新列表 </button>
+          <button class="secondary" onclick="logout()" style="color:var(--danger); border-color:rgba(255,100,100,0.3)">🚪
+            退出登录 </button>
+        </div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="secondary" onclick="loadLicenses()">🔄 刷新列表 </button>
-        <button class="secondary" onclick="logout()" style="color:var(--danger); border-color:rgba(255,100,100,0.3)">🚪
-          退出登录 </button>
-      </div>
-    </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label"> 总卡密数(Keys) </div>
-        <div class="stat-value" id="stat-total"> -</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label"> 总卡密数(Keys) </div>
+          <div class="stat-value" id="stat-total"> -</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"> 活跃中(Active) </div>
+          <div class="stat-value" id="stat-active" style="color:var(--success)"> -</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"> 已吊销(Revoked) </div>
+          <div class="stat-value" id="stat-revoked" style="color:var(--danger)"> -</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"> 临期 / 已过期(Sub) </div>
+          <div class="stat-value" id="stat-expiring" style="color:var(--warning)"> -</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label"> 活跃中(Active) </div>
-        <div class="stat-value" id="stat-active" style="color:var(--success)"> -</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label"> 已吊销(Revoked) </div>
-        <div class="stat-value" id="stat-revoked" style="color:var(--danger)"> -</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label"> 临期 / 已过期(Sub) </div>
-        <div class="stat-value" id="stat-expiring" style="color:var(--warning)"> -</div>
-      </div>
-    </div>
 
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('generate')">⚡ 极速生卡 </div>
-      <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理 </div>
-      <div class="tab" onclick="switchTab('settings')">⚙️ 系统设置 </div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('generate')">⚡ 极速生卡 </div>
+        <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理 </div>
+        <div class="tab" onclick="switchTab('notifications')">📢 广播通知 </div>
+        <div class="tab" onclick="switchTab('settings')">⚙️ 系统设置 </div>
+      </div>
     </div>
 
     <!--Tab: Generate-->
@@ -719,10 +753,13 @@ export const adminHtml = `<!DOCTYPE html>
           <div class="form-group">
             <label>产品线标识(Product ID) </label>
             <div class="dropdown-container">
-              <input type="text" id="genProductId" value="smartmp" placeholder="输入 ID 或点击选择历史记录" autocomplete="off"
-                onfocus="showDropdown()" oninput="updateProductHelpers()">
-              <div id="productDropdown" class="custom-dropdown"> </div>
+              <input type="text" id="genProductId" value="smartmp" placeholder="输入新产品 或 下拉选择已有产品" autocomplete="off"
+                onfocus="loadAndShowProducts()" oninput="filterProducts(this.value)">
+              <div id="productDropdown" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"> </div>
             </div>
+            <p class="help-text" style="font-size:11px; color:var(--text-main); margin-top:4px;">
+              💡 可直接输入新产品，或点击选择已有产品
+            </p>
           </div>
           <div class="form-group">
             <label>绑定用户名 / 备注(可选) </label>
@@ -773,40 +810,42 @@ export const adminHtml = `<!DOCTYPE html>
 
     <!--Tab: Manage-->
     <div id="sec-manage" class="section">
-      <div class="search-bar" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
-        <div class="search-input-wrap" style="flex:1; min-width:200px; max-width:300px;">
-          <input type="text" id="keywordSearch" placeholder="搜索卡密、用户名 (Ctrl+K)" oninput="debounceSearch()">
+      <div class="sticky-tools">
+        <div class="search-bar" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:12px;">
+          <div class="search-input-wrap" style="flex:1; min-width:200px; max-width:300px;">
+            <input type="text" id="keywordSearch" placeholder="搜索卡密、用户名 (Ctrl+K)" oninput="debounceSearch()">
+          </div>
+
+          <!-- 快速状态筛选 -->
+          <div style="display:flex; gap:4px; margin-left:8px;" id="statusFilterGroup">
+            <button class="secondary" onclick="filterStatus('all', this)"
+              style="padding:4px 8px; font-size:12px; background:var(--accent); color:#fff;">全部</button>
+            <button class="secondary" onclick="filterStatus('active', this)"
+              style="padding:4px 8px; font-size:12px;">活跃</button>
+            <button class="secondary" onclick="filterStatus('revoked', this)"
+              style="padding:4px 8px; font-size:12px;">已吊销</button>
+            <button class="secondary" id="btnFilterExpiring" onclick="filterStatus('expiring', this)"
+              style="padding:4px 8px; font-size:12px;">临期/过期</button>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-left:auto; align-items:center;">
+            <!-- 排序 -->
+            <select id="sortOrder" onchange="applySort()"
+              style="padding:6px; font-size:12px; border-radius:6px; background:#0d1117; color:var(--text-bright); border:1px solid var(--border-color); width:auto;">
+              <option value="created_desc">最新生成↓</option>
+              <option value="created_asc">最早生成↑</option>
+              <option value="devices_desc">配额最高↓</option>
+            </select>
+
+            <!-- 产品筛选 -->
+            <select id="filterProductId" onchange="loadLicenses()"
+              style="padding:6px; font-size:12px; border-radius:6px; background:#0d1117; color:var(--text-bright); border:1px solid var(--border-color); width:auto; max-width:180px;">
+              <option value=""> 所有产品线(Show All) </option>
+            </select>
+          </div>
         </div>
 
-        <!-- 快速状态筛选 -->
-        <div style="display:flex; gap:4px; margin-left:8px;" id="statusFilterGroup">
-          <button class="secondary" onclick="filterStatus('all', this)"
-            style="padding:4px 8px; font-size:12px; background:var(--accent); color:#fff;">全部</button>
-          <button class="secondary" onclick="filterStatus('active', this)"
-            style="padding:4px 8px; font-size:12px;">活跃</button>
-          <button class="secondary" onclick="filterStatus('revoked', this)"
-            style="padding:4px 8px; font-size:12px;">已吊销</button>
-          <button class="secondary" id="btnFilterExpiring" onclick="filterStatus('expiring', this)"
-            style="padding:4px 8px; font-size:12px;">临期/过期</button>
-        </div>
-
-        <div style="display:flex; gap:8px; margin-left:auto; align-items:center;">
-          <!-- 排序 -->
-          <select id="sortOrder" onchange="applySort()"
-            style="padding:6px; font-size:12px; border-radius:6px; background:#0d1117; color:var(--text-bright); border:1px solid var(--border-color); width:auto;">
-            <option value="created_desc">最新生成↓</option>
-            <option value="created_asc">最早生成↑</option>
-            <option value="devices_desc">配额最高↓</option>
-          </select>
-
-          <!-- 产品筛选 -->
-          <select id="filterProductId" onchange="loadLicenses()"
-            style="padding:6px; font-size:12px; border-radius:6px; background:#0d1117; color:var(--text-bright); border:1px solid var(--border-color); width:auto; max-width:180px;">
-            <option value=""> 所有产品线(Show All) </option>
-          </select>
-        </div>
-
-        <div style="display:flex; width:100%; justify-content:space-between; align-items:center; margin-top:8px;">
+        <div style="display:flex; width:100%; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div style="display:flex; gap:8px;">
             <button class="secondary" onclick="exportData()" style="padding:4px 8px; font-size:12px;">📤 导出JSON</button>
             <button class="secondary" onclick="exportExcel()" style="padding:4px 8px; font-size:12px;">📊
@@ -823,7 +862,7 @@ export const adminHtml = `<!DOCTYPE html>
       <div id="licListContainer" style="padding-bottom: 90px;">
         <div class="table-container">
           <table id="licTable">
-            <thead>
+            <thead style="position:sticky; top:calc(var(--header-h) + var(--tools-h)); z-index:170; background:var(--panel-bg);">
               <tr>
                 <th>激活码(Key) </th>
                 <th> 基本信息 </th>
@@ -838,11 +877,26 @@ export const adminHtml = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!--Tab: Notifications-->
+    <div id="sec-notifications" class="section">
+      <div class="sticky-tools">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 style="margin:0; font-size:18px;">💡 全域精准广播管理</h2>
+          <button class="primary" onclick="editNotification()">✨ 新建公告通知</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px;">
+        <div id="notificationListContainer" style="min-height: 200px;">
+          <div style="text-align:center; padding:50px; color:var(--text-main)">🚀 加载中...</div>
+        </div>
+      </div>
+    </div>
+
     <!--Tab: Settings-->
     <div id="sec-settings" class="section">
-      <div class="card">
+      <div class="sticky-tools">
         <div class="settings-header"
-          style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; border-bottom:1px solid var(--border-color); padding-bottom:16px;">
+          style="display:flex; justify-content:space-between; align-items:center;">
           <h2 style="margin:0; font-size:20px; display:flex; align-items:center; gap:12px;">
             <span style="font-size:24px;">⚙️</span> 系统后台全局配置
           </h2>
@@ -851,7 +905,8 @@ export const adminHtml = `<!DOCTYPE html>
             <span class="icon">💾</span> 立即保存所有更改
           </button>
         </div>
-
+      </div>
+      <div class="card" style="margin-top:20px;">
         <div class="settings-grid">
           <!-- 安全与账户卡片 -->
           <div class="settings-card settings-group">
@@ -999,6 +1054,8 @@ export const adminHtml = `<!DOCTYPE html>
       <optgroup label="设备管理">
         <option value="unbind">📱 强制踢出设备</option>
         <option value="set_max_devices">🔢 修改上线额度</option>
+        <option value="set_risk_threshold">⏱️ 修改24h风控阈值</option>
+        <option value="reset_risk_level">🛡️ 重置风控等级</option>
       </optgroup>
       <optgroup label="AI 管理">
         <option value="set_ai_quota">🤖 配置专属 AI 额度</option>
@@ -1176,8 +1233,24 @@ export const adminHtml = `<!DOCTYPE html>
       document.getElementById('sec-' + tab).classList.add('active');
       if (tab === 'manage') loadLicenses();
       if (tab === 'settings') loadSettings();
+      if (tab === 'notifications') loadNotifications();
       // 在标签切换时同步更新底栏可见性，防全局遮挡
       if (typeof updateBatchBar === 'function') updateBatchBar();
+      
+      // 切换标签后，高度可能因不同面板的内容而变化，触发同步
+      setTimeout(syncStickyHeights, 50);
+    }
+
+    function syncStickyHeights() {
+      const header = document.getElementById('stickyHeader');
+      const tools = document.querySelector('.sticky-tools');
+      const root = document.documentElement;
+      if (header) {
+        root.style.setProperty('--header-h', header.offsetHeight + 'px');
+      }
+      if (tools && tools.offsetParent !== null) { // 仅当工具栏可见时更新其高度变量
+        root.style.setProperty('--tools-h', tools.offsetHeight + 'px');
+      }
     }
 
     let currentPagination = null;
@@ -1246,14 +1319,95 @@ export const adminHtml = `<!DOCTYPE html>
       hideDropdown();
     }
 
+    // 从服务器加载所有产品并显示下拉框
+    let ALL_PRODUCTS_CACHE = [];
+    async function loadAndShowProducts() {
+      const dropdown = document.getElementById('productDropdown');
+      
+      // 显示加载中
+      dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">加载产品列表...</div>';
+      dropdown.classList.add('active');
+      
+      try {
+        // 如果缓存为空，从服务器获取
+        if (ALL_PRODUCTS_CACHE.length === 0) {
+          const res = await fetch('/api/v1/auth/admin/products', {
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+          });
+          const data = await res.json();
+          if (data.success && data.products) {
+            ALL_PRODUCTS_CACHE = data.products;
+          }
+        }
+        
+        // 渲染产品列表
+        renderProductDropdown(ALL_PRODUCTS_CACHE);
+      } catch (e) {
+        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--error); text-align:center;">加载失败，请重试</div>';
+      }
+    }
+    
+    // 根据输入过滤产品
+    function filterProducts(searchVal) {
+      const dropdown = document.getElementById('productDropdown');
+      const search = searchVal.toLowerCase();
+      
+      // 如果输入的是新产品（不在列表中），显示提示
+      const matches = ALL_PRODUCTS_CACHE.filter(p => p.toLowerCase().includes(search));
+      
+      if (matches.length === 0 && search) {
+        // 输入的是新产品
+        dropdown.innerHTML = \`
+          <div style="padding:8px 12px; font-size:12px; color:var(--text-main); border-bottom:1px solid var(--border-color);">
+            📝 将创建新产品: <b style="color:var(--accent);">\${searchVal}</b>
+          </div>
+          <div style="padding:8px 12px; font-size:11px; color:var(--success);">
+            ✓ 点击其他地方确认输入
+          </div>
+        \`;
+        dropdown.classList.add('active');
+      } else {
+        renderProductDropdown(matches);
+      }
+    }
+    
+    // 渲染产品下拉框
+    function renderProductDropdown(products) {
+      const dropdown = document.getElementById('productDropdown');
+      const currentVal = document.getElementById('genProductId').value;
+      
+      if (products.length === 0) {
+        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">暂无产品，请输入新产品ID</div>';
+      } else {
+        let listHtml = '<div style="padding:6px 12px; font-size:11px; color:var(--text-main); background:var(--panel-bg); border-bottom:1px solid var(--border-color);">📦 已有产品（点击选择）</div>';
+        products.forEach(p => {
+          const isSelected = p === currentVal ? '✓ ' : '';
+          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${p}')" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>\${isSelected}\${p}</span>
+          </div>\`;
+        });
+        dropdown.innerHTML = listHtml;
+      }
+      dropdown.classList.add('active');
+    }
+
     // 更新产品辅助器（包括筛选下拉和自定义生卡下拉框）
     function updateProductHelpers() {
       const filterSelect = document.getElementById('filterProductId');
       const dropdown = document.getElementById('productDropdown');
       const genInput = document.getElementById('genProductId');
 
-      // 1. 同步当前所有存量产品到历史库
-      ALL_LICENSES.forEach(l => PRODUCT_HISTORY.add(l.product_id));
+      // 1. 同步当前所有存量产品到历史库（包括主产品和订阅产品）
+      ALL_LICENSES.forEach(l => {
+        // 添加主产品
+        PRODUCT_HISTORY.add(l.product_id);
+        // 添加所有订阅产品
+        if (l.subscriptions && Array.isArray(l.subscriptions)) {
+          l.subscriptions.forEach(sub => {
+            if (sub.product_id) PRODUCT_HISTORY.add(sub.product_id);
+          });
+        }
+      });
 
       // 2. 更新管理列表上方的“筛选”下拉框
       const currentFilter = filterSelect.value;
@@ -1337,6 +1491,9 @@ export const adminHtml = `<!DOCTYPE html>
         updateStats(currentStats);
         updateProductHelpers();
         renderCards(ALL_LICENSES, currentPagination);
+        
+        // 数据加载完成后，重新计算可能因内容长短影响的高度
+        setTimeout(syncStickyHeights, 100);
       } catch (e) {
         container.style.opacity = '1';
         container.innerHTML = '<div style="padding:20px; color:var(--danger)">⚠️ 无法连接服务器</div>';
@@ -1467,7 +1624,7 @@ export const adminHtml = `<!DOCTYPE html>
         </div>
       </div>
       <!-- 动态设备面板插槽 -->
-      <div id="devicePanel_\${lic.license_key}" style="display:none; grid-column:1/-1; background:#0d1117; border-top:1px dashed #30363d; padding:12px 16px;"></div>
+      <div id="devicePanel_\${lic.license_key}" style="display:none; grid-column:1/-1; background:#0d1117; border-top:1px dashed #30363d; padding:12px 16px; max-height: 350px; overflow-y: auto;"></div>
     \`;
       });
 
@@ -2185,6 +2342,28 @@ export const adminHtml = `<!DOCTYPE html>
         });
         if (!res) return;
         params.max_devices = parseInt(res[0]) || 1;
+      } else if (action === 'set_risk_threshold') {
+        const res = await showModal({
+          title: '修改24h风控阈值',
+          inputs: [{ 
+            label: \`设置 \${keys.length} 个卡密的24小时绑定阈值 (1-100，输入0表示自动计算)：\`, 
+            value: '0', 
+            type: 'number',
+            placeholder: '0=自动, 10=固定10台'
+          }],
+          confirmText: '确定'
+        });
+        if (!res) return;
+        params.risk_threshold = parseInt(res[0]) || 0;
+      } else if (action === 'reset_risk_level') {
+        const confirmed = await showModal({
+          title: '🛡️ 重置风控等级',
+          message: \`确定重置 \${keys.length} 个卡密的风控等级为 0（解除限制）吗？\`,
+          confirmText: '确定重置',
+          danger: true
+        });
+        if (!confirmed) return;
+        // reset_risk_level 不需要额外参数
       } else if (action === 'add_subscription') {
         const res = await showModal({
           title: '续费/加产品',
@@ -2434,6 +2613,219 @@ export const adminHtml = `<!DOCTYPE html>
         showToast('提交异常: ' + e.message, 'error');
       }
     }
+      async function applySubConfig() {
+      // 占位函数：前序旧代码遗留或扩展
+      showToast('配置已应用', 'success');
+    }
+
+    // ==========================================
+    // 📢 广播通知管理模块
+    // ==========================================
+    let ALL_NOTIFICATIONS = [];
+
+    async function loadNotifications() {
+      const container = document.getElementById('notificationListContainer');
+      container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">🚀 正在拉取通知数据...</div>';
+      try {
+        const res = await fetch('/api/v1/auth/admin/notifications', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+        if (data.success) {
+          ALL_NOTIFICATIONS = data.data || [];
+          renderNotifications();
+        } else {
+          container.innerHTML = '<div style="color:var(--danger)">❌ 失败: ' + data.msg + '</div>';
+        }
+      } catch (e) {
+        container.innerHTML = '<div style="color:var(--danger)">⚠️ 无法连接服务器</div>';
+      }
+    }
+
+    function renderNotifications() {
+      const container = document.getElementById('notificationListContainer');
+      if (ALL_NOTIFICATIONS.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">📭 暂无任何广播公告，点击右上角新建。</div>';
+        return;
+      }
+      
+      let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
+      ALL_NOTIFICATIONS.forEach(n => {
+        let badgeCls = 'badge-success';
+        let badgeTxt = '已发布';
+        if (n.status === 'draft') { badgeCls = 'badge-warning'; badgeTxt = '草稿'; }
+        if (n.status === 'offline') { badgeCls = 'badge-danger'; badgeTxt = '已下线'; }
+
+        let typeBadge = '';
+        if (n.type === 'update') typeBadge = '🔥 更新';
+        else if (n.type === 'warning') typeBadge = '⚠️ 警告';
+        else typeBadge = 'ℹ️ 消息';
+
+        const dDate = new Date(n.created_at + 'Z').toLocaleString('zh-CN');
+
+        html += '<div class="lic-row" style="grid-template-columns: 3fr 1fr 1.5fr;">' +
+          '<div>' +
+            '<div style="font-weight:bold; font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:8px;">' +
+              '<span class="badge" style="background:var(--panel-bg); border:1px solid var(--border-color); color:var(--text-bright);">' + typeBadge + '</span>' +
+              escapeHTML(n.title) +
+              (n.is_force ? '<span class="badge badge-danger">强提醒</span>' : '') +
+            '</div>' +
+            '<div style="color:var(--text-main); font-size:13px; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">' +
+              escapeHTML(n.content) +
+            '</div>' +
+              '<div style="font-size:12px; color:var(--indigo); margin-bottom: 4px;">' +
+                (n.action_url ? '🔗 ' + escapeHTML(n.action_url) : '') +
+              '</div>' +
+              '<div style="font-size:11px; color:var(--text-main); opacity: 0.8;">' +
+                '🎯 受众产品: ' + (n.target_rules ? '<code style="background:var(--panel-bg); padding:2px 4px; border-radius:4px;">' + escapeHTML(n.target_rules) + '</code>' : '<span style="color:var(--success)">全域公开</span>') +
+              '</div>' +
+            '</div>' +
+          '<div style="display:flex; flex-direction:column; justify-content:center; gap:4px; font-size:12px;">' +
+            '<div>状态: <span class="badge ' + badgeCls + '">' + badgeTxt + '</span></div>' +
+            '<div style="color:var(--text-main);">创建于 ' + dDate + '</div>' +
+          '</div>' +
+          '<div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">' +
+            '<button class="secondary" style="padding:4px 8px; font-size:12px;" onclick="toggleNotificationStatus(\\'' + n.id + '\\', \\'' + n.status + '\\')">' +
+              (n.status === 'published' ? '⬇️ 下线' : '🚀 发布') +
+            '</button>' +
+            '<button class="secondary" style="padding:4px 8px; font-size:12px;" onclick="editNotification(\\'' + n.id + '\\')">✏️ 编辑</button>' +
+            '<button class="danger" style="padding:4px 8px; font-size:12px;" onclick="deleteNotification(\\'' + n.id + '\\')">🗑️</button>' +
+          '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    async function editNotification(id = null) {
+      let isEdit = !!id;
+      let target = isEdit ? ALL_NOTIFICATIONS.find(x => x.id === id) : { title: '', content: '', action_url: '', type: 'info', status: 'draft', is_force: 0, target_rules: '' };
+      
+      // 使用扩展版的 showModal
+      const inputs = [
+        { label: '公告标题 (Title)', value: target.title, placeholder: '输入引人注目的短语' },
+        { label: '公告正文 (Content)', value: target.content, placeholder: '尽量使用纯文本' },
+        { label: '跳转链接 (Action URL)', value: target.action_url || '', placeholder: '如: https://...' },
+        { label: '公告类型 (update, info, warning)', value: target.type },
+        { label: '受众产品 ID (多个用英文逗号分隔，留空则全放)', value: target.target_rules || '', placeholder: '如: ZenClean,ZenImage' },
+        { label: '是否阻断强提醒 (1=是, 0=否)', value: String(target.is_force || 0), type: 'number' }
+      ];
+
+      const res = await showModal({
+        title: isEdit ? '✏️ 修改广播公告' : '✨ 新建全域广播公告',
+        inputs,
+        confirmText: '保存数据'
+      });
+
+      if (!res) return;
+
+      const title = res[0] ? res[0].trim() : '';
+      const content = res[1] ? res[1].trim() : '';
+      const action_url = res[2] ? res[2].trim() : '';
+      const type = (res[3] || 'info').trim().toLowerCase();
+      const target_rules = res[4] ? res[4].trim() : '';
+      const is_force = parseInt(res[5]) || 0;
+
+      if (!title || !content) {
+        showToast('标题和正文为必填项！', 'warning');
+        return;
+      }
+
+      try {
+        const fetchRes = await fetch('/api/v1/auth/admin/notifications', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: isEdit ? id : undefined,
+            title, content, action_url, type, is_force, target_rules,
+            status: isEdit ? target.status : 'draft'  // 新建默认草稿
+          })
+        });
+        const data = await fetchRes.json();
+        if (data.success) {
+          showToast(data.msg, 'success');
+          loadNotifications();
+        } else {
+          showToast('保存失败: ' + data.msg, 'error');
+        }
+      } catch (e) {
+        showToast('网络错误: ' + e.message, 'error');
+      }
+    }
+
+    async function toggleNotificationStatus(id, currentStatus) {
+      const nextStatus = currentStatus === 'published' ? 'offline' : 'published';
+      const actionTxt = nextStatus === 'published' ? '🚀 确定立即将此公告推送到全网客户端吗？' : '⬇️ 确定下线该公告吗？(下线后客户端将不再收到)';
+      
+      const confirmed = await showModal({
+        title: '状态变更',
+        message: actionTxt,
+        confirmText: '确定执行',
+        danger: nextStatus === 'published'
+      });
+
+      if (!confirmed) return;
+
+      try {
+        const fetchRes = await fetch('/api/v1/auth/admin/notifications/' + id + '/status', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        const data = await fetchRes.json();
+        if (data.success) {
+          showToast(data.msg, 'success');
+          loadNotifications();
+        } else {
+          showToast('失败: ' + data.msg, 'error');
+        }
+      } catch (e) {
+        showToast('网络错误: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteNotification(id) {
+      const confirmed = await showModal({
+        title: '🗑️ 永久删除',
+        message: '删除后无法恢复，确定移除该公告吗？',
+        confirmText: '确定删除',
+        danger: true
+      });
+      if (!confirmed) return;
+
+      try {
+        const fetchRes = await fetch('/api/v1/auth/admin/notifications/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await fetchRes.json();
+        if (data.success) {
+          showToast('公告已移除', 'success');
+          loadNotifications();
+        } else {
+          showToast('移除失败: ' + data.msg, 'error');
+        }
+      } catch (e) {
+        showToast('网络错误: ' + e.message, 'error');
+      }
+    }
+
+
+    // 滚动监听：处理顶部粘性样式的视觉增强
+    window.addEventListener('scroll', () => {
+      const header = document.getElementById('stickyHeader');
+      if (window.scrollY > 20) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    });
+
+    // 初始化高度校准
+    window.addEventListener('resize', syncStickyHeights);
+    window.addEventListener('load', () => {
+      setTimeout(syncStickyHeights, 500); // 留出资源加载余量
+    });
   </script>
 </body>
 

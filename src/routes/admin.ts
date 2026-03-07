@@ -57,6 +57,33 @@ app.post('/generate', async (c) => {
   }
 });
 
+// API: 获取所有产品列表（主产品 + 订阅产品）
+app.get('/products', async (c) => {
+  try {
+    // 从 Licenses 表获取主产品
+    const { results: mainProducts } = await c.env.DB.prepare(
+      `SELECT DISTINCT product_id as id FROM Licenses WHERE product_id IS NOT NULL`
+    ).all();
+
+    // 从 Subscriptions 表获取订阅产品
+    const { results: subProducts } = await c.env.DB.prepare(
+      `SELECT DISTINCT product_id as id FROM Subscriptions WHERE product_id IS NOT NULL`
+    ).all();
+
+    // 合并去重
+    const allProducts = new Set<string>();
+    mainProducts.forEach((p: any) => allProducts.add(p.id));
+    subProducts.forEach((p: any) => allProducts.add(p.id));
+
+    return c.json({
+      success: true,
+      products: [...allProducts].sort()
+    });
+  } catch (error) {
+    console.error('获取产品列表失败:', error);
+    return c.json({ success: false, msg: '获取产品列表失败' }, 500);
+  }
+});
 
 
 // API: (管理员) 服务端分页专用查询接口 (Phase 11.5)
@@ -76,8 +103,16 @@ app.get('/licenses', async (c) => {
     let params: any[] = [];
 
     if (productId) {
-      whereClauses.push('l.product_id = ?');
-      params.push(productId);
+      // 同时匹配主产品和订阅产品
+      whereClauses.push(`(
+        l.product_id = ? 
+        OR EXISTS (
+          SELECT 1 FROM Subscriptions s 
+          WHERE s.license_key = l.license_key 
+            AND s.product_id = ?
+        )
+      )`);
+      params.push(productId, productId);
     }
 
     if (search) {
@@ -474,7 +509,7 @@ app.post('/licenses/batch', async (c) => {
     }
 
     // 安全检查：仅允许白名单内置操作
-    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege', 'set_ai_quota', 'set_ai_model', 'set_ai_key', 'set_ai_base'];
+    const validActions = ['revoke', 'restore', 'delete', 'unbind', 'set_max_devices', 'set_user_name', 'add_subscription', 'remove_subscription', 'set_offline_privilege', 'set_ai_quota', 'set_ai_model', 'set_ai_key', 'set_ai_base', 'set_risk_threshold', 'reset_risk_level'];
     if (!validActions.includes(action)) {
       return c.json({ success: false, msg: '非法或尚未支持的批量操作指令' }, 400);
     }
@@ -540,6 +575,35 @@ app.post('/licenses/batch', async (c) => {
         break;
       }
 
+      // 5.5 批量修改24h风控阈值
+      case 'set_risk_threshold': {
+        const riskThreshold = parseInt(params?.risk_threshold);
+        if (isNaN(riskThreshold) || riskThreshold < 1 || riskThreshold > 100) {
+          return c.json({ success: false, msg: '风控阈值必须在 1-100 之间，或设为 0 表示自动计算' }, 400);
+        }
+        // risk_threshold = 0 表示使用自动计算，其他值表示固定阈值
+        const thresholdValue = riskThreshold === 0 ? null : riskThreshold;
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET risk_threshold = ? WHERE license_key = ?`).bind(thresholdValue, key)
+          );
+        });
+        const desc = riskThreshold === 0 ? '自动计算' : `${riskThreshold}台`;
+        successMsg = `已将 ${keys.length} 个卡密的24h风控阈值设置为 ${desc}`;
+        break;
+      }
+
+      // 5.6 批量重置风控等级
+      case 'reset_risk_level': {
+        keys.forEach((key: string) => {
+          statements.push(
+            c.env.DB.prepare(`UPDATE Licenses SET risk_level = 0 WHERE license_key = ?`).bind(key)
+          );
+        });
+        successMsg = `已重置 ${keys.length} 个卡密的风控等级为 0（正常状态）`;
+        break;
+      }
+
       // 6. 批量修改备注
       case 'set_user_name': {
         // 温和截断防爆
@@ -588,11 +652,23 @@ app.post('/licenses/batch', async (c) => {
           return c.json({ success: false, msg: '缺少要移除的产品 ID' }, 400);
         }
         keys.forEach((key: string) => {
+          // 1. 删除指定订阅
           statements.push(
             c.env.DB.prepare(`DELETE FROM Subscriptions WHERE license_key = ? AND product_id = ?`).bind(key, rmProductId)
           );
+          // 2. 如果被删除的是主产品，更新主产品为其他订阅或 NULL
+          statements.push(
+            c.env.DB.prepare(`
+              UPDATE Licenses 
+              SET product_id = COALESCE(
+                (SELECT product_id FROM Subscriptions WHERE license_key = ? LIMIT 1),
+                'default'
+              )
+              WHERE license_key = ? AND product_id = ?
+            `).bind(key, key, rmProductId)
+          );
         });
-        successMsg = `已从 ${keys.length} 个卡密中移除 [${rmProductId}] 产品权限`;
+        successMsg = `已从 ${keys.length} 个卡密中移除 [${rmProductId}] 产品权限，并自动更新主产品`;
         break;
       }
 
@@ -689,6 +765,106 @@ app.post('/licenses/batch', async (c) => {
   } catch (error: any) {
     console.error('Batch Error:', error);
     return c.json({ success: false, msg: '批量操作失败: ' + (error.message || '未知错误') }, 500);
+  }
+});
+
+
+// ==========================================
+// API: (管理员) 全域精准广播通知管理
+// ==========================================
+
+// 获取通知列表
+app.get('/notifications', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM Notifications ORDER BY created_at DESC`
+    ).all();
+    return c.json({ success: true, data: results });
+  } catch (error: any) {
+    console.error('获取通知列表失败:', error);
+    return c.json({ success: false, msg: '获取通知列表失败' }, 500);
+  }
+});
+
+// 新增或更新通知
+app.post('/notifications', async (c) => {
+  try {
+    const { id, title, content, action_url, type = 'info', status = 'draft', is_force = 0, target_rules } = await c.req.json();
+
+    if (!title || !content) {
+      return c.json({ success: false, msg: '缺少必填字段(标题或内容)' }, 400);
+    }
+
+    if (id) {
+      // Update
+      const result = await c.env.DB.prepare(
+        `UPDATE Notifications 
+         SET title = ?, content = ?, action_url = ?, type = ?, status = ?, is_force = ?, target_rules = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`
+      ).bind(title, content, action_url || null, type, status, is_force ? 1 : 0, target_rules || null, id).run();
+
+      if (result.meta?.changes > 0) {
+        return c.json({ success: true, msg: '公告更新成功', id });
+      } else {
+        return c.json({ success: false, msg: '未找到对应公告' }, 404);
+      }
+    } else {
+      // Insert
+      const newId = 'notice_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      await c.env.DB.prepare(
+        `INSERT INTO Notifications (id, title, content, action_url, type, status, is_force, target_rules) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(newId, title, content, action_url || null, type, status, is_force ? 1 : 0, target_rules || null).run();
+
+      return c.json({ success: true, msg: '新建公告成功', id: newId });
+    }
+  } catch (error: any) {
+    console.error('保存通知失败:', error);
+    return c.json({ success: false, msg: '保存通知失败' }, 500);
+  }
+});
+
+// 删除通知
+app.delete('/notifications/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const result = await c.env.DB.prepare(
+      `DELETE FROM Notifications WHERE id = ?`
+    ).bind(id).run();
+
+    if (result.meta?.changes > 0) {
+      return c.json({ success: true, msg: '公告已删除' });
+    } else {
+      return c.json({ success: false, msg: '未找到指定公告' }, 404);
+    }
+  } catch (error: any) {
+    console.error('删除通知失败:', error);
+    return c.json({ success: false, msg: '删除通知失败' }, 500);
+  }
+});
+
+// 快捷修改通知状态 (上线/下线)
+app.post('/notifications/:id/status', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { status } = await c.req.json();
+
+    if (!['draft', 'published', 'offline'].includes(status)) {
+      return c.json({ success: false, msg: '状态值非法' }, 400);
+    }
+
+    const result = await c.env.DB.prepare(
+      `UPDATE Notifications SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(status, id).run();
+
+    if (result.meta?.changes > 0) {
+      return c.json({ success: true, msg: `公告状态已更改为 ${status}` });
+    } else {
+      return c.json({ success: false, msg: '未找到指定公告' }, 404);
+    }
+  } catch (error: any) {
+    console.error('修改通知状态失败:', error);
+    return c.json({ success: false, msg: '修改状态失败' }, 500);
   }
 });
 

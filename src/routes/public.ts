@@ -110,13 +110,17 @@ app.post('/verify', async (c) => {
         ).bind(license_key).first<{ cnt: number }>();
 
         const recentCount = recentBinds?.cnt || 0;
-        if (recentCount >= 3) {
+        // 动态风控阈值：优先使用激活码指定的阈值，否则根据 max_devices 的 30% 计算
+        const riskThreshold = license.risk_threshold !== null && license.risk_threshold !== undefined
+          ? license.risk_threshold
+          : Math.min(Math.max(Math.floor(license.max_devices * 0.3), 3), 50);
+        if (recentCount >= riskThreshold) {
           // 触发风控升级
           const newRiskLevel = Math.min(riskLevel + 1, 5);
           await c.env.DB.prepare(
             `UPDATE Licenses SET risk_level = ? WHERE license_key = ?`
           ).bind(newRiskLevel, license_key).run();
-          console.warn(`[RISK_ESCALATION] 卡密 ${license_key} 24h内绑定${recentCount}台新设备，风控升级: ${riskLevel} → ${newRiskLevel}`);
+          console.warn(`[RISK_ESCALATION] 卡密 ${license_key} 24h内绑定${recentCount}台新设备(阈值${riskThreshold})，风控升级: ${riskLevel} → ${newRiskLevel}`);
         }
       } catch (e) {
         // 风控逻辑不应阻断正常业务流程
@@ -163,12 +167,49 @@ app.post('/verify', async (c) => {
     }
     const trueToken = await sign(safePayload, c.env.JWT_SECRET);
 
+    // 追加: 获取符合产品 ID 受众的最新的一条已发布的全局广播通知
+    let notification = undefined;
+    try {
+      // 提取当前用户拥有的所有产品 ID
+      const userProductIds = products.map((p: any) => p.product_id);
+
+      // 查询逻辑：status = 'published'，且 (target_rules 为空 OR 包含在当前用户产品列表中)
+      const { results } = await c.env.DB.prepare(
+        `SELECT id, type, title, content, action_url, is_force, target_rules 
+         FROM Notifications 
+         WHERE status = 'published' 
+         ORDER BY created_at DESC`
+      ).all();
+
+      // 在内存中进行逻辑匹配（暂不使用复杂的 SQL JSON 函数以保持兼容性）
+      const matches = (results || []).filter((n: any) => {
+        if (!n.target_rules || n.target_rules.trim() === '') return true; // 全局公告
+        const targetList = n.target_rules.split(',').map((s: string) => s.trim());
+        return targetList.some((tid: string) => userProductIds.includes(tid));
+      });
+
+      if (matches.length > 0) {
+        const firstMatch = matches[0] as any;
+        notification = {
+          id: firstMatch.id,
+          type: firstMatch.type,
+          title: firstMatch.title,
+          content: firstMatch.content,
+          action_url: firstMatch.action_url,
+          is_force: firstMatch.is_force === 1
+        };
+      }
+    } catch (e) {
+      console.error('获取过滤后的广播通知失败', e);
+    }
+
     return c.json({
       success: true,
       msg: currentDevice ? '验证通过，设备已授权' : '新设备绑定成功，系统已授权',
       token: trueToken,
       products,  // 返回全部产品及其订阅状态
-      server_time: new Date().toISOString()  // 额外返回当前服务器时间供插件对齐
+      server_time: new Date().toISOString(),  // 额外返回当前服务器时间供插件对齐
+      notification // 附加符合规则的广播通知
     });
 
   } catch (error: any) {
