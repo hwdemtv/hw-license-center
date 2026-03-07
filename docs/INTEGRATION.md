@@ -304,3 +304,69 @@ for chunk in response:
 
 **优先级：** 单卡专属额度 > 全局默认额度。留空单卡配置则自动退化为全局值。
 
+
+---
+
+## 六、全域精准广播通知对接
+
+系统内置了全球范围的公告广播功能，允许管理员实时向客户端推送 **更新提醒、维护说明或精准营销消息**。
+
+### 1. 响应结构说明
+
+当客户端调用 `/api/v1/auth/verify` 进行权限校验时，响应体中可能包含一个 `notification` 对象：
+
+```json
+{
+  "success": true,
+  "notification": {
+    "id": "notice_1772889692072_rcfb",
+    "type": "update",
+    "title": "版本更新公告",
+    "content": "全新的全域精准广播系统已上线，欢迎体验！",
+    "action_url": "https://example.com/changelog",
+    "is_force": true
+  },
+  "products": [...]
+}
+```
+
+### 2. 核心字段定义
+
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | String | 公告唯一标识，客户端可用此 ID 记录“已读”状态。 |
+| `type` | Enum | 公告类型：`info` (普通), `update` (更新), `warning` (警告)。 |
+| `title` | String | 公告标题。 |
+| `content` | String | 公告具体正文内容（支持多行）。 |
+| `action_url` | String | (可选) 点击公告后的跳转链接。 |
+| `is_force` | Boolean | **是否强提醒**。如果为 `true`，建议客户端使用模态弹窗强制显示，直至用户确认。 |
+
+### 3. 精准定向 (Targeting) 逻辑
+
+管理员可以在后台设置公告的“受众产品 ID”。
+- **全域广播**：若公告未设置受众，则所有调用校验接口的设备都会收到。
+- **精准广播**：若公告设置了受众（如 `ZenClean`），则只有拥有该产品有效订阅的客户端才会收到该公告。
+
+> [!TIP]
+> **下发优先级**：如果同时存在匹配该产品的定向公告和全域公告，系统会优先下发**最新的一条定向公告**。
+
+### 4. 客户端展示建议 (伪代码)
+
+```javascript
+const res = await verifyLicense(...);
+if (res.notification) {
+    const note = res.notification;
+    
+    // 检查本地是否已弹出过该 ID 的公告
+    if (localStorage.getItem('last_notice_id') !== note.id) {
+        if (note.is_force) {
+            // 强提醒：必须弹窗
+            showModal(note.title, note.content, note.action_url);
+        } else {
+            // 轻提醒：横幅或托盘通知
+            showBanner(note.title, note.content);
+        }
+        localStorage.setItem('last_notice_id', note.id);
+    }
+}
+```
