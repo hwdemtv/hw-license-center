@@ -307,66 +307,62 @@ for chunk in response:
 
 ---
 
-## 六、全域精准广播通知对接
+## 六、全域精准广播通知对接方案 (v1.0)
 
-系统内置了全球范围的公告广播功能，允许管理员实时向客户端推送 **更新提醒、维护说明或精准营销消息**。
+本方案旨在指导 `hw-license-center` (或任何兼容的许可证服务器) 如何正确下发广播通知载荷，以便客户端能够捕获并展示运营/维护消息。
 
-### 1. 响应结构说明
+### 1. 触发时机
 
-当客户端调用 `/api/v1/auth/verify` 进行权限校验时，响应体中可能包含一个 `notification` 对象：
+客户端在以下场景调用 `/api/v1/auth/verify` 时，后端可在响应体中附带 `notification` 对象：
+
+*   **手动激活**：用户在激活页面输入序列号时。
+*   **启动核验**：程序启动时静默检查本地 Token 效力。
+*   **后台心跳**：每 30 分钟一次的常规权限巡检。
+*   **扫描前复核**：在执行深度操作前的瞬时权限确认。
+
+### 2. 响应数据结构 (JSON)
+
+后端在原有的 `success`, `token`, `products` 等字段同级，新增一个可选的 `notification` 对象。
 
 ```json
 {
   "success": true,
+  "token": "...",
+  "products": [...],
   "notification": {
-    "id": "notice_1772889692072_rcfb",
+    "id": "notice_20240307_001",
     "type": "update",
-    "title": "版本更新公告",
-    "content": "全新的全域精准广播系统已上线，欢迎体验！",
-    "action_url": "https://example.com/changelog",
+    "title": "系统维护通知",
+    "content": "我们将于今晚 23:00 进行服务器例行维护，届时云端 AI 识别可能会有短暂波动。",
+    "action_url": "https://example.com/announcement",
     "is_force": true
-  },
-  "products": [...]
+  }
 }
 ```
 
-### 2. 核心字段定义
+### 3. 字段定义规范
 
-| 字段 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| `id` | String | 公告唯一标识，客户端可用此 ID 记录“已读”状态。 |
-| `type` | Enum | 公告类型：`info` (普通), `update` (更新), `warning` (警告)。 |
-| `title` | String | 公告标题。 |
-| `content` | String | 公告具体正文内容（支持多行）。 |
-| `action_url` | String | (可选) 点击公告后的跳转链接。 |
-| `is_force` | Boolean | **是否强提醒**。如果为 `true`，建议客户端使用模态弹窗强制显示，直至用户确认。 |
+| 字段名 | 类型 | 必填 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `id` | String | 是 | 唯一标识符。客户端据此判断是否为新消息。 |
+| `type` | String | 否 | 类型标识，建议值：`info` (普通), `update` (更新), `warning` (警告)。 |
+| `title` | String | 是 | 公告标题（显示在弹窗/横幅顶部）。 |
+| `content` | String | 是 | 公告正文。支持多行文本。内容变更会触发已读用户重新弹窗。 |
+| `action_url` | String | 否 | 点击“去看看”跳转链接。若为空则不显示跳转按钮。 |
+| `is_force` | Boolean | 否 | 交互级别：`true` (强提醒，中间大弹窗); `false` (轻提醒，消息条)。 |
 
-### 3. 精准定向 (Targeting) 逻辑
+### 4. 客户端逻辑说明 (供参考)
 
-管理员可以在后台设置公告的“受众产品 ID”。
-- **全域广播**：若公告未设置受众，则所有调用校验接口的设备都会收到。
-- **精准广播**：若公告设置了受众（如 `ZenClean`），则只有拥有该产品有效订阅的客户端才会收到该公告。
+*   **智能去重逻辑**：客户端会缓存 `last_notice_fingerprint` (即 ID + Content 的哈希)。
+    *   如果 ID 没变且 Content 没变：不弹窗（防骚扰）。
+    *   如果 ID 变了 OR Content 变了：立刻弹窗。
+*   **交互表现**：
+    *   `is_force: true`: 强提醒（中间大弹窗，必须点击确认）。
+    *   `is_force: false`: 轻提醒（顶部黑色消息条，3-10秒后消失）。
+*   **线程安全**：客户端已处理跨线程 UI 刷新，后端只需保证 JSON 输出符合上述结构。
 
-> [!TIP]
-> **下发优先级**：如果同时存在匹配该产品的定向公告和全域公告，系统会优先下发**最新的一条定向公告**。
+### 5. 最佳实践建议
 
-### 4. 客户端展示建议 (伪代码)
-
-```javascript
-const res = await verifyLicense(...);
-if (res.notification) {
-    const note = res.notification;
-    
-    // 检查本地是否已弹出过该 ID 的公告
-    if (localStorage.getItem('last_notice_id') !== note.id) {
-        if (note.is_force) {
-            // 强提醒：必须弹窗
-            showModal(note.title, note.content, note.action_url);
-        } else {
-            // 轻提醒：横幅或托盘通知
-            showBanner(note.title, note.content);
-        }
-        localStorage.setItem('last_notice_id', note.id);
-    }
-}
-```
+*   **分片推送**：管理员可根据 `product_id` 为不同订阅用户下发不同公告。
+*   **强制性更新**：如果发布了重大版本，建议下发 `is_force: true` 的通知并指向下载页。
+*   **内容驱动**：若只是微调通知文案，不需要更改 ID，客户端也能自动感知并重新提醒。
