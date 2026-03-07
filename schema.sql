@@ -1,6 +1,3 @@
-DROP TABLE IF EXISTS Devices;
-DROP TABLE IF EXISTS Licenses;
-
 -- 激活码登记表
 CREATE TABLE IF NOT EXISTS Licenses (
     license_key TEXT PRIMARY KEY,
