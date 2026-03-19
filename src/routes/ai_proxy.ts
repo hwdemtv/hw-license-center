@@ -139,9 +139,8 @@ app.post('/chat/completions', async (c) => {
     }
 
     // 强制覆盖模型名（防止客户端恶意请求天价模型）
-    if (!reqBody.model) {
-        reqBody.model = activeModel;
-    }
+    // 无论客户端是否提供 model，都强制使用配置的模型
+    reqBody.model = activeModel;
 
     const targetUrl = `${activeApiBase.replace(/\/+$/, '')}/chat/completions`;
 
@@ -166,22 +165,31 @@ app.post('/chat/completions', async (c) => {
         }
 
         // --- Step 5: 扣减额度（请求成功即扣） ---
-        // 使用 waitUntil 异步写入，不阻塞流响应
+        // 流式请求使用 waitUntil 异步扣减（不阻塞响应）
+        // 非流式请求同步扣减（确保不丢失）
         const quotaUpdatePromise = c.env.DB.prepare(
             `UPDATE Licenses SET ai_used_today = ai_used_today + 1 WHERE license_key = ?`
         ).bind(licenseKey).run();
 
-        // Cloudflare Workers 环境支持 ctx.waitUntil
-        if ((c as any).executionCtx?.waitUntil) {
-            (c as any).executionCtx.waitUntil(quotaUpdatePromise);
+        const isStream = reqBody.stream === true;
+
+        if (isStream) {
+            // 流式响应：使用 waitUntil 异步扣减，不阻塞响应
+            if ((c as any).executionCtx?.waitUntil) {
+                (c as any).executionCtx.waitUntil(quotaUpdatePromise);
+            } else {
+                quotaUpdatePromise.catch((e: any) => console.error('[AI_PROXY] 流式额度扣减失败:', e));
+            }
         } else {
-            // Node.js 本地环境退化为 fire-and-forget
-            quotaUpdatePromise.catch((e: any) => console.error('[AI_PROXY] 额度扣减失败:', e));
+            // 非流式响应：同步扣减后再返回，确保不丢失
+            try {
+                await quotaUpdatePromise;
+            } catch (e: any) {
+                console.error('[AI_PROXY] 额度扣减失败:', e);
+            }
         }
 
         // --- Step 6: 流式透传响应 ---
-        const isStream = reqBody.stream === true;
-
         if (isStream && upstreamRes.body) {
             // SSE 流式透传
             return new Response(upstreamRes.body, {
@@ -244,9 +252,12 @@ app.get('/quota', async (c) => {
     const dailyQuota = license.ai_daily_quota ?? aiConfig.defaultDailyQuota;
     let usedToday = license.ai_used_today || 0;
 
-    // 跨日自动归零
+    // 跨日自动归零（同步写入数据库，保持一致性）
     if (license.ai_last_reset_date !== today) {
         usedToday = 0;
+        await c.env.DB.prepare(
+            `UPDATE Licenses SET ai_used_today = 0, ai_last_reset_date = ? WHERE license_key = ?`
+        ).bind(today, licenseKey).run();
     }
 
     return c.json({

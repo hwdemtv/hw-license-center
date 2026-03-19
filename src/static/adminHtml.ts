@@ -1595,8 +1595,8 @@ export const adminHtml = `<!DOCTYPE html>
           \${lic.offline_days_override !== null && lic.offline_days_override !== undefined
             ? \`<span class="badge" style="background:#6c5ce7; color:white; font-weight:bold" title="单卡脱机特权">⚡ 离线: \${lic.offline_days_override}天</span>\`
             : ''}
-          \${lic.ai_daily_quota !== null && lic.ai_daily_quota !== undefined
-            ? \`<span class="badge" style="background:var(--accent-glow); color:var(--accent); border:1px solid var(--accent); font-weight:bold" title="专属 AI 额度 (今日已用 / 每日总配额)">🤖 AI 额度: \${lic.ai_used_today || 0} / \${lic.ai_daily_quota}</span>\`
+          \${(lic.ai_daily_quota != null && lic.ai_daily_quota != undefined && String(lic.ai_daily_quota).trim() !== '')
+            ? \`<span class="badge" style="background:var(--accent-glow); color:var(--accent); border:1px solid var(--accent); font-weight:bold" title="专属 AI 额度 (今日已用 / 每日总配额)">🤖 AI 额度: \${Number(lic.ai_used_today) || 0} / \${Number(lic.ai_daily_quota)}</span>\`
             : ''}
           \${(lic.ai_model_override || lic.ai_base_override)
             ? \`<span class="badge" style="background:rgba(210, 153, 34, 0.1); color:var(--warning); border: 1px solid rgba(210, 153, 34, 0.2);" title="已重写专属大模型或代理专线">👑 专属模型</span>\`
