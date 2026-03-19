@@ -740,6 +740,7 @@ export const adminHtml = `<!DOCTYPE html>
 
       <div class="tabs">
         <div class="tab active" onclick="switchTab('generate')">⚡ 极速生卡 </div>
+        <div class="tab" onclick="switchTab('offline')">🔌 离线激活 </div>
         <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理 </div>
         <div class="tab" onclick="switchTab('notifications')">📢 广播通知 </div>
         <div class="tab" onclick="switchTab('settings')">⚙️ 系统设置 </div>
@@ -804,6 +805,125 @@ export const adminHtml = `<!DOCTYPE html>
             <button class="secondary" style="flex:2;" onclick="copyGenResult()">📋 复制纯卡密文本 </button>
             <button class="primary" style="flex:1;" onclick="switchTab('manage')">👀 查看管理列表 </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!--Tab: Offline Activation-->
+    <div id="sec-offline" class="section">
+      <div class="card">
+        <div style="margin-bottom:16px; padding:12px; background:rgba(108,92,231,0.1); border-radius:8px; border-left:3px solid #6c5ce7;">
+          <strong style="color:#6c5ce7;">🔌 离线激活说明</strong>
+          <p style="margin:8px 0 0; font-size:13px; color:var(--text-main);">
+            适用于无网络环境的设备激活。用户先在离线设备上获取设备ID，管理员根据设备ID生成预绑定的激活码。
+          </p>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>设备ID <span style="color:var(--danger);">*</span></label>
+            <input type="text" id="offlineDeviceId" placeholder="用户提供的设备ID，如: DEV-A1B2C3D4E5">
+            <p class="help-text" style="font-size:11px; color:var(--text-main); margin-top:4px;">
+              设备ID由用户软件生成，通常在软件"关于"或"激活"界面显示
+            </p>
+          </div>
+          <div class="form-group">
+            <label>产品线标识</label>
+            <input type="text" id="offlineProductId" value="smartmp" placeholder="产品ID">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>订阅有效期(天数, 留空为永久)</label>
+            <input type="number" id="offlineDuration" placeholder="例如: 365">
+          </div>
+          <div class="form-group">
+            <label>离线天数(有效期)</label>
+            <input type="number" id="offlineDays" placeholder="默认使用全局配置" value="">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>用户备注(可选)</label>
+            <input type="text" id="offlineUserName" placeholder="客户名、订单号等">
+          </div>
+          <div class="form-group">
+            <label>设备配额</label>
+            <input type="number" id="offlineMaxDevices" value="1" min="1">
+            <p class="help-text" style="font-size:11px; color:var(--text-main); margin-top:4px;">
+              离线激活码通常绑定单设备，建议保持为1
+            </p>
+          </div>
+        </div>
+
+        <button class="primary" id="btnOfflineGen" onclick="doGenerateOffline()" style="width:100%; margin-top:10px;">
+          ✨ 生成离线激活码
+        </button>
+
+        <div id="offlineResult" style="display:none; margin-top:24px; padding-top:24px; border-top:1px dashed var(--border-color);">
+          <label style="color:var(--success); font-weight:600; margin-bottom:12px; display:block;">✅ 离线激活码生成成功：</label>
+
+          <div style="background:#0d1117; padding:16px; border-radius:8px; margin-bottom:12px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="color:var(--text-main); font-size:12px;">激活码：</span>
+              <button class="secondary" style="padding:2px 8px; font-size:11px;" onclick="copyText(document.getElementById('offlineLicenseKey').innerText)">复制</button>
+            </div>
+            <div id="offlineLicenseKey" style="font-family:monospace; font-size:14px; color:#6c5ce7; word-break:break-all;"></div>
+          </div>
+
+          <div style="background:#0d1117; padding:16px; border-radius:8px; margin-bottom:12px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="color:var(--text-main); font-size:12px;">绑定设备：</span>
+            </div>
+            <div id="offlineDeviceIdResult" style="font-family:monospace; font-size:14px; color:var(--accent);"></div>
+          </div>
+
+          <div style="background:#0d1117; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="color:var(--text-main); font-size:12px;">离线激活令牌（完整激活串）：</span>
+              <button class="secondary" style="padding:2px 8px; font-size:11px;" onclick="copyText(document.getElementById('offlineToken').innerText)">复制</button>
+            </div>
+            <div id="offlineToken" style="font-family:monospace; font-size:11px; color:var(--success); word-break:break-all; max-height:100px; overflow-y:auto;"></div>
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button class="secondary" style="flex:1;" onclick="resetOfflineForm()">🔄 继续生成</button>
+            <button class="primary" style="flex:1;" onclick="switchTab('manage')">👀 查看管理列表</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 批量生成 -->
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin:0 0 16px; font-size:16px;">📦 批量生成离线激活码</h3>
+        <div class="form-group">
+          <label>设备ID列表（每行一个）</label>
+          <textarea id="offlineBatchDevices" rows="6" placeholder="DEV-A1B2C3&#10;DEV-D4E5F6&#10;DEV-G7H8I9" style="width:100%; font-family:monospace; font-size:13px;"></textarea>
+          <p class="help-text" style="font-size:11px; color:var(--text-main); margin-top:4px;">
+            支持格式：每行一个设备ID，或 JSON 格式 [{"device_id":"xxx","user_name":"备注"},...]
+          </p>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>产品ID</label>
+            <input type="text" id="offlineBatchProductId" value="smartmp">
+          </div>
+          <div class="form-group">
+            <label>有效天数</label>
+            <input type="number" id="offlineBatchDuration" placeholder="365">
+          </div>
+        </div>
+        <button class="secondary" onclick="doGenerateOfflineBatch()" style="width:100%;">
+          📦 批量生成
+        </button>
+
+        <div id="offlineBatchResult" style="display:none; margin-top:16px;">
+          <div style="background:#0d1117; padding:16px; border-radius:8px; max-height:300px; overflow-y:auto; border:1px solid var(--border-color);">
+            <pre id="offlineBatchOutput" style="margin:0; font-size:11px; white-space:pre-wrap;"></pre>
+          </div>
+          <button class="secondary" style="margin-top:12px;" onclick="copyText(document.getElementById('offlineBatchOutput').innerText)">📋 复制全部</button>
         </div>
       </div>
     </div>
@@ -1783,6 +1903,135 @@ export const adminHtml = `<!DOCTYPE html>
         } else { showToast('错误: ' + data.msg, 'error'); }
       } catch (e) { showToast('通讯失败: ' + e.message, 'error'); }
       finally { btn.disabled = false; btn.innerText = "✨ 立即制卡并激活订阅"; }
+    }
+
+    // 离线激活码生成
+    async function doGenerateOffline() {
+      const btn = document.getElementById('btnOfflineGen');
+      const deviceId = document.getElementById('offlineDeviceId').value.trim();
+      const productId = document.getElementById('offlineProductId').value.trim() || 'default';
+      const durationDays = document.getElementById('offlineDuration').value;
+      const offlineDays = document.getElementById('offlineDays').value;
+      const userName = document.getElementById('offlineUserName').value.trim();
+      const maxDevices = parseInt(document.getElementById('offlineMaxDevices').value) || 1;
+
+      if (!deviceId) {
+        showToast('请输入设备ID', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = '⚡ 正在生成...';
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/generate-offline', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_id: deviceId,
+            product_id: productId,
+            duration_days: durationDays ? parseInt(durationDays) : null,
+            offline_days: offlineDays ? parseInt(offlineDays) : null,
+            user_name: userName,
+            max_devices: maxDevices
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('offlineLicenseKey').innerText = data.data.license_key;
+          document.getElementById('offlineDeviceIdResult').innerText = data.data.device_id;
+          document.getElementById('offlineToken').innerText = data.data.offline_token;
+          document.getElementById('offlineResult').style.display = 'block';
+          showToast('离线激活码生成成功', 'success');
+        } else {
+          showToast('错误: ' + data.msg, 'error');
+        }
+      } catch (e) {
+        showToast('通讯失败: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '✨ 生成离线激活码';
+      }
+    }
+
+    // 批量生成离线激活码
+    async function doGenerateOfflineBatch() {
+      const input = document.getElementById('offlineBatchDevices').value.trim();
+      const productId = document.getElementById('offlineBatchProductId').value.trim() || 'default';
+      const durationDays = document.getElementById('offlineBatchDuration').value;
+
+      if (!input) {
+        showToast('请输入设备ID列表', 'error');
+        return;
+      }
+
+      // 解析输入
+      let devices = [];
+      try {
+        // 尝试 JSON 格式
+        devices = JSON.parse(input);
+      } catch {
+        // 按行解析
+        devices = input.split('\\n').map(line => {
+          const trimmed = line.trim();
+          return trimmed ? { device_id: trimmed } : null;
+        }).filter(Boolean);
+      }
+
+      if (devices.length === 0) {
+        showToast('未找到有效的设备ID', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/generate-offline-batch', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            devices: devices,
+            product_id: productId,
+            duration_days: durationDays ? parseInt(durationDays) : null
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          // 格式化输出
+          let output = '设备ID\\t\\t激活码\\t\\t\\t离线令牌\\n';
+          output += '='.repeat(80) + '\\n';
+          data.data.forEach(item => {
+            output += \`\${item.device_id}\\t\${item.license_key}\\t\${item.offline_token.substring(0, 40)}...\\n\`;
+          });
+          if (data.skipped && data.skipped.length > 0) {
+            output += '\\n⚠️ 跳过的设备:\\n' + data.skipped.join('\\n');
+          }
+
+          document.getElementById('offlineBatchOutput').innerText = output;
+          document.getElementById('offlineBatchResult').style.display = 'block';
+          showToast(\`成功生成 \${data.data.length} 个离线激活码\`, 'success');
+        } else {
+          showToast('错误: ' + data.msg, 'error');
+        }
+      } catch (e) {
+        showToast('通讯失败: ' + e.message, 'error');
+      }
+    }
+
+    // 重置离线激活表单
+    function resetOfflineForm() {
+      document.getElementById('offlineDeviceId').value = '';
+      document.getElementById('offlineUserName').value = '';
+      document.getElementById('offlineResult').style.display = 'none';
+    }
+
+    // 通用复制文本
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('已复制到剪贴板', 'success');
+      }).catch(() => {
+        showToast('复制失败', 'error');
+      });
     }
 
     // API 交互函数

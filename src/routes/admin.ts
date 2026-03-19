@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { Env, generateLicenseKey } from '../types';
+import { Env, generateLicenseKey, generateOfflineLicenseKey, OfflineActivationData } from '../types';
 import { D1PreparedStatement } from '../db/adapter';
+import { generateOfflineToken } from '../utils/offline-activation';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +56,218 @@ app.post('/generate', async (c) => {
     }
     console.error('API Error:', error.message, error.stack);
     return c.json({ success: false, msg: '生成卡密时遇到内部错误' }, 500);
+  }
+});
+
+// API: (管理员) 生成离线激活码（预绑定设备ID）
+app.post('/generate-offline', async (c) => {
+  try {
+    const { device_id, product_id = 'default', duration_days, user_name = '', max_devices = 1, offline_days } = await c.req.json();
+
+    // 参数校验
+    if (!device_id || typeof device_id !== 'string') {
+      return c.json({ success: false, msg: '缺少设备ID' }, 400);
+    }
+
+    // 设备ID长度限制
+    const safeDeviceId = String(device_id).trim().substring(0, 128);
+    if (safeDeviceId.length < 4) {
+      return c.json({ success: false, msg: '设备ID长度不足（最少4字符）' }, 400);
+    }
+
+    // 检查设备ID是否已被预绑定
+    const existing = await c.env.DB.prepare(
+      `SELECT license_key FROM Licenses WHERE prebound_device_id = ?`
+    ).bind(safeDeviceId).first();
+
+    if (existing) {
+      return c.json({ success: false, msg: `该设备ID已被预绑定到激活码: ${existing.license_key}` }, 400);
+    }
+
+    // 生成离线激活码（长码格式）
+    const licenseKey = generateOfflineLicenseKey();
+
+    // 计算到期时间
+    let expiresAt: string | null = null;
+    if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
+      const date = new Date();
+      date.setDate(date.getDate() + duration_days);
+      expiresAt = date.toISOString();
+    }
+
+    // 离线天数（默认使用全局配置或30天）
+    let finalOfflineDays = offline_days;
+    if (!finalOfflineDays) {
+      try {
+        const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('jwt_offline_days').first<{ value: string }>();
+        finalOfflineDays = cfg?.value ? parseInt(cfg.value) : 30;
+      } catch (_) {
+        finalOfflineDays = 30;
+      }
+    }
+
+    // 插入 Licenses 表（带预绑定设备ID）
+    await c.env.DB.prepare(
+      `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices, offline_days_override, prebound_device_id) VALUES(?, ?, ?, 'active', ?, ?, ?)`
+    ).bind(licenseKey, product_id, user_name, max_devices, finalOfflineDays, safeDeviceId).run();
+
+    // 插入 Subscriptions 记录
+    await c.env.DB.prepare(
+      `INSERT INTO Subscriptions(license_key, product_id, expires_at) VALUES(?, ?, ?)`
+    ).bind(licenseKey, product_id, expiresAt).run();
+
+    // 生成离线激活令牌（用于客户端验证）
+    const activationData: OfflineActivationData = {
+      license_key: licenseKey,
+      device_id: safeDeviceId,
+      product_id: product_id,
+      expires_at: expiresAt,
+      max_devices: max_devices,
+      offline_days: finalOfflineDays,
+      generated_at: new Date().toISOString()
+    };
+
+    // 确保 JWT_SECRET 存在
+    if (!c.env.JWT_SECRET) {
+      return c.json({ success: false, msg: '服务器配置错误：缺少 JWT_SECRET' }, 500);
+    }
+
+    const offlineToken = await generateOfflineToken(activationData, c.env.JWT_SECRET);
+
+    return c.json({
+      success: true,
+      msg: '离线激活码生成成功',
+      data: {
+        license_key: licenseKey,
+        device_id: safeDeviceId,
+        product_id: product_id,
+        expires_at: expiresAt,
+        max_devices: max_devices,
+        offline_days: finalOfflineDays,
+        offline_token: offlineToken  // 客户端可用的完整激活令牌
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Generate Offline License Error:', error);
+    return c.json({ success: false, msg: '生成离线激活码失败: ' + error.message }, 500);
+  }
+});
+
+// API: (管理员) 批量生成离线激活码
+app.post('/generate-offline-batch', async (c) => {
+  try {
+    const { devices, product_id = 'default', duration_days, offline_days, max_devices = 1 } = await c.req.json();
+
+    if (!Array.isArray(devices) || devices.length === 0) {
+      return c.json({ success: false, msg: '缺少设备ID列表' }, 400);
+    }
+
+    if (devices.length > 100) {
+      return c.json({ success: false, msg: '单次最多生成100个离线激活码' }, 400);
+    }
+
+    // 计算到期时间
+    let expiresAt: string | null = null;
+    if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
+      const date = new Date();
+      date.setDate(date.getDate() + duration_days);
+      expiresAt = date.toISOString();
+    }
+
+    // 离线天数
+    let finalOfflineDays = offline_days;
+    if (!finalOfflineDays) {
+      try {
+        const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('jwt_offline_days').first<{ value: string }>();
+        finalOfflineDays = cfg?.value ? parseInt(cfg.value) : 30;
+      } catch (_) {
+        finalOfflineDays = 30;
+      }
+    }
+
+    // 确保 JWT_SECRET 存在
+    if (!c.env.JWT_SECRET) {
+      return c.json({ success: false, msg: '服务器配置错误：缺少 JWT_SECRET' }, 500);
+    }
+
+    const results: any[] = [];
+    const statements: D1PreparedStatement[] = [];
+    const skippedDevices: string[] = [];
+
+    for (const device of devices) {
+      const deviceId = String(device.device_id || device).trim().substring(0, 128);
+      const userName = device.user_name || '';
+
+      if (deviceId.length < 4) {
+        skippedDevices.push(deviceId);
+        continue;
+      }
+
+      // 检查是否已绑定
+      const existing = await c.env.DB.prepare(
+        `SELECT license_key FROM Licenses WHERE prebound_device_id = ?`
+      ).bind(deviceId).first();
+
+      if (existing) {
+        skippedDevices.push(`${deviceId}(已绑定)`);
+        continue;
+      }
+
+      const licenseKey = generateOfflineLicenseKey();
+
+      // Licenses 插入
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices, offline_days_override, prebound_device_id) VALUES(?, ?, ?, 'active', ?, ?, ?)`
+        ).bind(licenseKey, product_id, userName, max_devices, finalOfflineDays, deviceId)
+      );
+
+      // Subscriptions 插入
+      statements.push(
+        c.env.DB.prepare(
+          `INSERT INTO Subscriptions(license_key, product_id, expires_at) VALUES(?, ?, ?)`
+        ).bind(licenseKey, product_id, expiresAt)
+      );
+
+      // 生成离线令牌
+      const activationData: OfflineActivationData = {
+        license_key: licenseKey,
+        device_id: deviceId,
+        product_id: product_id,
+        expires_at: expiresAt,
+        max_devices: max_devices,
+        offline_days: finalOfflineDays,
+        generated_at: new Date().toISOString()
+      };
+      const offlineToken = await generateOfflineToken(activationData, c.env.JWT_SECRET);
+
+      results.push({
+        device_id: deviceId,
+        license_key: licenseKey,
+        offline_token: offlineToken
+      });
+    }
+
+    // 批量执行
+    if (statements.length > 0) {
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+        const chunk = statements.slice(i, i + BATCH_SIZE);
+        await c.env.DB.batch(chunk);
+      }
+    }
+
+    return c.json({
+      success: true,
+      msg: `成功生成 ${results.length} 个离线激活码`,
+      data: results,
+      skipped: skippedDevices.length > 0 ? skippedDevices : undefined
+    });
+
+  } catch (error: any) {
+    console.error('Batch Generate Offline License Error:', error);
+    return c.json({ success: false, msg: '批量生成失败: ' + error.message }, 500);
   }
 });
 

@@ -25,6 +25,7 @@ export interface License {
     unbind_count: number;
     last_unbind_period: string | null;
     offline_days_override: number | null;
+    prebound_device_id: string | null;  // 预绑定设备ID（离线激活专用）
     risk_level: number;
     risk_threshold: number | null;
     ai_daily_quota: number | null;
@@ -97,4 +98,38 @@ export function generateLicenseKey(prefix = 'KEY'): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const getChunk = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     return `${prefix.toUpperCase().slice(0, 5)}-${getChunk()}-${getChunk()}-${getChunk()}`;
+}
+
+// 辅助函数：生成离线激活码（长码格式: OFF-XXXX-XXXX-XXXX-XXXX）
+export function generateOfflineLicenseKey(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const getChunk = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `OFF-${getChunk()}-${getChunk()}-${getChunk()}-${getChunk()}`;
+}
+
+// ==================== 离线激活相关 ====================
+
+/**
+ * 离线激活码数据结构
+ */
+export interface OfflineActivationData {
+    license_key: string;      // 激活码
+    device_id: string;        // 预绑定设备ID
+    product_id: string;       // 产品ID
+    expires_at: string | null; // 到期时间
+    max_devices: number;      // 最大设备数
+    offline_days: number;     // 离线天数
+    generated_at: string;     // 生成时间
+}
+
+/**
+ * 离线激活响应
+ */
+export interface OfflineActivationResponse {
+    success: boolean;
+    msg: string;
+    license_key?: string;     // 激活码
+    device_id?: string;       // 预绑定设备ID
+    product_id?: string;      // 产品ID
+    expires_at?: string;      // 到期时间
 }

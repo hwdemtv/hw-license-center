@@ -22,7 +22,7 @@ app.post('/verify', async (c) => {
 
     // 1. 查询激活码是否有效（不再限制必须与请求产品的初始所属权一致，实现”一卡跑全产品”跨界）
     const { results: licenses } = await c.env.DB.prepare(
-      `SELECT *, offline_days_override FROM Licenses WHERE license_key = ? `
+      `SELECT *, offline_days_override, prebound_device_id FROM Licenses WHERE license_key = ? `
     ).bind(license_key).all<License>();
 
     if (licenses.length === 0) {
@@ -33,6 +33,18 @@ app.post('/verify', async (c) => {
 
     if (license.status === 'revoked') {
       return c.json({ success: false, msg: '此激活码已被官方停用' }, 403);
+    }
+
+    // --- 新增：离线激活码预绑定设备验证 ---
+    if (license.prebound_device_id) {
+      // 该激活码是离线激活码，必须匹配预绑定的设备ID
+      if (device_id !== license.prebound_device_id) {
+        return c.json({
+          success: false,
+          msg: '该激活码已绑定到指定设备，当前设备不匹配',
+          code: 'DEVICE_MISMATCH'
+        }, 403);
+      }
     }
 
     // --- 新增：查询该激活码下的所有产品订阅 ---

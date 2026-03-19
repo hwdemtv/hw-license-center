@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS Licenses (
     status TEXT NOT NULL DEFAULT 'active',      -- 'active', 'inactive', 'revoked'
     max_devices INTEGER NOT NULL DEFAULT 2,     -- 最大允许绑定设备数
     offline_days_override INTEGER DEFAULT NULL, -- 单卡专属离线特权天数（优先级高于全局配置）
+    prebound_device_id TEXT DEFAULT NULL,       -- 预绑定设备ID（离线激活专用）
     risk_level INTEGER DEFAULT 0,               -- 风控等级（0=正常, 1=注意, 2=警告, 3=降权）
     risk_threshold INTEGER DEFAULT NULL,        -- 24h绑定阈值（NULL=自动计算，否则使用此值）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
