@@ -829,7 +829,14 @@ export const adminHtml = `<!DOCTYPE html>
           </div>
           <div class="form-group">
             <label>产品线标识</label>
-            <input type="text" id="offlineProductId" value="smartmp" placeholder="产品ID">
+            <div class="dropdown-container">
+              <input type="text" id="offlineProductId" value="smartmp" placeholder="输入新产品 或 下拉选择已有产品" autocomplete="off"
+                onfocus="loadAndShowProducts('offlineProductId', 'offlineProductDropdown')" oninput="filterProducts(this.value, 'offlineProductId', 'offlineProductDropdown')">
+              <div id="offlineProductDropdown" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"> </div>
+            </div>
+            <p class="help-text" style="font-size:11px; color:var(--text-main); margin-top:4px;">
+              💡 可直接输入新产品，或点击选择已有产品
+            </p>
           </div>
         </div>
 
@@ -908,7 +915,11 @@ export const adminHtml = `<!DOCTYPE html>
         <div class="form-grid">
           <div class="form-group">
             <label>产品ID</label>
-            <input type="text" id="offlineBatchProductId" value="smartmp">
+            <div class="dropdown-container">
+              <input type="text" id="offlineBatchProductId" value="smartmp" placeholder="输入新产品 或 下拉选择" autocomplete="off"
+                onfocus="loadAndShowProducts('offlineBatchProductId', 'offlineBatchProductDropdown')" oninput="filterProducts(this.value, 'offlineBatchProductId', 'offlineBatchProductDropdown')">
+              <div id="offlineBatchProductDropdown" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"> </div>
+            </div>
           </div>
           <div class="form-group">
             <label>有效天数</label>
@@ -1441,13 +1452,13 @@ export const adminHtml = `<!DOCTYPE html>
 
     // 从服务器加载所有产品并显示下拉框
     let ALL_PRODUCTS_CACHE = [];
-    async function loadAndShowProducts() {
-      const dropdown = document.getElementById('productDropdown');
-      
+    async function loadAndShowProducts(inputId = 'genProductId', dropdownId = 'productDropdown') {
+      const dropdown = document.getElementById(dropdownId);
+
       // 显示加载中
       dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">加载产品列表...</div>';
       dropdown.classList.add('active');
-      
+
       try {
         // 如果缓存为空，从服务器获取
         if (ALL_PRODUCTS_CACHE.length === 0) {
@@ -1459,22 +1470,22 @@ export const adminHtml = `<!DOCTYPE html>
             ALL_PRODUCTS_CACHE = data.products;
           }
         }
-        
+
         // 渲染产品列表
-        renderProductDropdown(ALL_PRODUCTS_CACHE);
+        renderProductDropdown(ALL_PRODUCTS_CACHE, inputId, dropdownId);
       } catch (e) {
         dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--error); text-align:center;">加载失败，请重试</div>';
       }
     }
-    
+
     // 根据输入过滤产品
-    function filterProducts(searchVal) {
-      const dropdown = document.getElementById('productDropdown');
+    function filterProducts(searchVal, inputId = 'genProductId', dropdownId = 'productDropdown') {
+      const dropdown = document.getElementById(dropdownId);
       const search = searchVal.toLowerCase();
-      
+
       // 如果输入的是新产品（不在列表中），显示提示
       const matches = ALL_PRODUCTS_CACHE.filter(p => p.toLowerCase().includes(search));
-      
+
       if (matches.length === 0 && search) {
         // 输入的是新产品
         dropdown.innerHTML = \`
@@ -1487,28 +1498,39 @@ export const adminHtml = `<!DOCTYPE html>
         \`;
         dropdown.classList.add('active');
       } else {
-        renderProductDropdown(matches);
+        renderProductDropdown(matches, inputId, dropdownId);
       }
     }
-    
+
     // 渲染产品下拉框
-    function renderProductDropdown(products) {
-      const dropdown = document.getElementById('productDropdown');
-      const currentVal = document.getElementById('genProductId').value;
-      
+    function renderProductDropdown(products, inputId = 'genProductId', dropdownId = 'productDropdown') {
+      const dropdown = document.getElementById(dropdownId);
+      const currentVal = document.getElementById(inputId).value;
+
       if (products.length === 0) {
         dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">暂无产品，请输入新产品ID</div>';
       } else {
         let listHtml = '<div style="padding:6px 12px; font-size:11px; color:var(--text-main); background:var(--panel-bg); border-bottom:1px solid var(--border-color);">📦 已有产品（点击选择）</div>';
         products.forEach(p => {
           const isSelected = p === currentVal ? '✓ ' : '';
-          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${p}')" style="display:flex; justify-content:space-between; align-items:center;">
+          listHtml += \`<div class="dropdown-item" onclick="setProductValue('\${inputId}', '\${p}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center;">
             <span>\${isSelected}\${p}</span>
           </div>\`;
         });
         dropdown.innerHTML = listHtml;
       }
       dropdown.classList.add('active');
+    }
+
+    // 通用设置产品值函数
+    function setProductValue(inputId, value, dropdownId) {
+      document.getElementById(inputId).value = value;
+      document.getElementById(dropdownId).classList.remove('active');
+    }
+
+    // 兼容旧函数名
+    function setGenProduct(val) {
+      setProductValue('genProductId', val, 'productDropdown');
     }
 
     // 更新产品辅助器（包括筛选下拉和自定义生卡下拉框）
