@@ -16,10 +16,9 @@ database_name = "smart-mp-db"
 database_id = "beb9e90a-93b0-480e-aa84-c4d958052006"
 
 # Bindings for KV Namespace (用于限流器存储)
-# 取消注释以启用全局限流（推荐生产环境启用）
-# [[kv_namespaces]]
-# binding = "RATE_LIMITER"
-# id = "your-kv-namespace-id"
+[[kv_namespaces]]
+binding = "RATE_LIMITER"
+id = "76525218c55640e09fbe6314bd31c75e"
 
 [vars]
 # 生产环境中已通过 wrangler secret 配置：
