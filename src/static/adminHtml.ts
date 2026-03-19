@@ -96,6 +96,17 @@ export const adminHtml = `<!DOCTYPE html>
       border: 1px solid var(--border-color);
       padding: 20px;
       border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card-clickable {
+      cursor: pointer;
+    }
+
+    .stat-card-clickable:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
     }
 
     .stat-label {
@@ -110,6 +121,135 @@ export const adminHtml = `<!DOCTYPE html>
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    /* 图表样式 */
+    .chart-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .bar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .bar-label {
+      width: 80px;
+      font-size: 12px;
+      color: var(--text-main);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 20px;
+      background: var(--card-bg);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .bar-value {
+      font-size: 12px;
+      color: var(--text-bright);
+      width: 40px;
+      text-align: right;
+    }
+
+    .donut-chart {
+      position: relative;
+      width: 140px;
+      height: 140px;
+    }
+
+    .donut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .donut-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .donut-label {
+      font-size: 11px;
+      color: var(--text-main);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .stat-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-row-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-bright);
+    }
+
+    .stat-row-value {
+      font-weight: 600;
+      font-size: 14px;
     }
 
     /* Tabs */
@@ -524,6 +664,193 @@ export const adminHtml = `<!DOCTYPE html>
       cursor: pointer;
     }
 
+    /* 搜索历史下拉框 */
+    .search-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+      max-width: 300px;
+    }
+    .search-history-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      z-index: 150;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .search-history-dropdown.active {
+      display: block;
+      animation: dropDownFade 0.2s ease-out;
+    }
+    .search-history-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-bright);
+    }
+    .search-history-item:hover {
+      background: #1c2128;
+      color: var(--accent);
+    }
+    .search-history-item .history-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .search-history-item .remove-history {
+      opacity: 0;
+      color: var(--text-main);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .search-history-item:hover .remove-history {
+      opacity: 1;
+    }
+    .search-history-item .remove-history:hover {
+      background: rgba(248, 81, 73, 0.1);
+      color: var(--danger);
+    }
+    .search-history-header {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .search-history-header .clear-all {
+      cursor: pointer;
+      color: var(--danger);
+    }
+    .search-history-header .clear-all:hover {
+      text-decoration: underline;
+    }
+
+    /* 高级筛选区域 */
+    .advanced-filter-section {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .advanced-filter-section.active {
+      display: block;
+      animation: dropDownFade 0.2s ease-out;
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .filter-row .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-row .filter-group label {
+      font-size: 12px;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+    .filter-row .filter-group select,
+    .filter-row .filter-group input {
+      padding: 4px 8px;
+      font-size: 12px;
+      width: auto;
+      min-width: 80px;
+    }
+
+    /* 导出选项对话框 */
+    .export-options-modal {
+      min-width: 450px;
+    }
+    .export-field-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 12px;
+    }
+    .export-field-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+    }
+    .export-field-item label {
+      font-size: 13px;
+      color: var(--text-bright);
+      cursor: pointer;
+    }
+
+    /* 批量操作进度条 */
+    .batch-progress-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 3000;
+    }
+    .batch-progress-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 300px;
+      text-align: center;
+    }
+    .batch-progress-bar {
+      height: 8px;
+      background: var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .batch-progress-bar .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    .batch-progress-text {
+      font-size: 14px;
+      color: var(--text-main);
+    }
+
+    /* 跨页全选提示 */
+    .select-all-across {
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .select-all-across button {
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+
     /* Toast */
     #toastContainer {
       position: fixed;
@@ -713,33 +1040,15 @@ export const adminHtml = `<!DOCTYPE html>
           <h1> 互为卡密中心 </h1>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="secondary" onclick="loadLicenses()">🔄 刷新列表 </button>
+          <button class="secondary" onclick="refreshCurrentTab()">🔄 刷新 </button>
           <button class="secondary" onclick="logout()" style="color:var(--danger); border-color:rgba(255,100,100,0.3)">🚪
             退出登录 </button>
         </div>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label"> 总卡密数(Keys) </div>
-          <div class="stat-value" id="stat-total"> -</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"> 活跃中(Active) </div>
-          <div class="stat-value" id="stat-active" style="color:var(--success)"> -</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"> 已吊销(Revoked) </div>
-          <div class="stat-value" id="stat-revoked" style="color:var(--danger)"> -</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"> 临期 / 已过期(Sub) </div>
-          <div class="stat-value" id="stat-expiring" style="color:var(--warning)"> -</div>
-        </div>
-      </div>
-
       <div class="tabs">
-        <div class="tab active" onclick="switchTab('generate')">⚡ 极速生卡 </div>
+        <div class="tab active" onclick="switchTab('dashboard')">📊 数据看板 </div>
+        <div class="tab" onclick="switchTab('generate')">⚡ 极速生卡 </div>
         <div class="tab" onclick="switchTab('offline')">🔌 离线激活 </div>
         <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理 </div>
         <div class="tab" onclick="switchTab('notifications')">📢 广播通知 </div>
@@ -747,8 +1056,115 @@ export const adminHtml = `<!DOCTYPE html>
       </div>
     </div>
 
+    <!--Tab: Dashboard-->
+    <div id="sec-dashboard" class="section active">
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <h2 style="margin:0; font-size:18px;">📊 数据看板</h2>
+          <span style="font-size:12px; color:var(--text-main);" id="dashboardUpdateTime"></span>
+        </div>
+
+        <!-- 核心指标卡片 -->
+        <div class="stats-grid" style="margin-bottom:0;">
+          <div class="stat-card stat-card-clickable" onclick="switchTab('manage')" title="点击跳转资产管理">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div class="stat-label">总卡密数</div>
+                <div class="stat-value" id="stat-total">-</div>
+              </div>
+              <div style="font-size:24px; opacity:0.3;">🔑</div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-clickable" onclick="filterByStatus('active')" title="点击筛选活跃卡密">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div class="stat-label">活跃中</div>
+                <div class="stat-value" id="stat-active" style="color:var(--success)">-</div>
+              </div>
+              <div style="font-size:24px; opacity:0.3;">✅</div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-clickable" onclick="filterByStatus('revoked')" title="点击筛选已吊销卡密">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div class="stat-label">已吊销</div>
+                <div class="stat-value" id="stat-revoked" style="color:var(--danger)">-</div>
+              </div>
+              <div style="font-size:24px; opacity:0.3;">🚫</div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-clickable" onclick="filterByStatus('expiring')" title="点击筛选临期卡密">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div class="stat-label">临期/过期</div>
+                <div class="stat-value" id="stat-expiring" style="color:var(--warning)">-</div>
+              </div>
+              <div style="font-size:24px; opacity:0.3;">⚠️</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图表区域 -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+        <!-- 状态分布图 -->
+        <div class="card">
+          <h3 style="margin:0 0 16px; font-size:15px;">📈 状态分布</h3>
+          <div id="statusChart" style="display:flex; align-items:center; justify-content:center; min-height:180px;">
+            <div style="text-align:center; color:var(--text-main);">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 设备使用情况图 -->
+        <div class="card">
+          <h3 style="margin:0 0 16px; font-size:15px;">📱 设备占用</h3>
+          <div id="deviceUsageStats" style="min-height:180px;">
+            <div style="text-align:center; padding:50px; color:var(--text-main);">加载中...</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+        <!-- 产品分布图 -->
+        <div class="card">
+          <h3 style="margin:0 0 16px; font-size:15px;">📦 产品分布</h3>
+          <div id="productDistStats" style="min-height:200px;">
+            <div style="text-align:center; padding:50px; color:var(--text-main);">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 订阅状态图 -->
+        <div class="card">
+          <h3 style="margin:0 0 16px; font-size:15px;">📅 订阅状态</h3>
+          <div id="subscriptionStats" style="min-height:200px;">
+            <div style="text-align:center; padding:50px; color:var(--text-main);">加载中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 特权统计 -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 16px; font-size:15px;">⚡ 特权与配置统计</h3>
+        <div id="privilegeStats" style="min-height:80px;">
+          <div style="text-align:center; padding:30px; color:var(--text-main);">加载中...</div>
+        </div>
+      </div>
+
+      <!-- 快捷操作 -->
+      <div class="card">
+        <h3 style="margin:0 0 16px; font-size:15px;">🚀 快捷操作</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <button class="primary" onclick="switchTab('generate')">✨ 生成新卡密</button>
+          <button class="secondary" onclick="switchTab('offline')">🔌 离线激活</button>
+          <button class="secondary" onclick="switchTab('manage')">🛠️ 资产管理</button>
+          <button class="secondary" onclick="switchTab('notifications')">📢 发布通知</button>
+          <button class="secondary" onclick="switchTab('settings')">⚙️ 系统设置</button>
+        </div>
+      </div>
+    </div>
+
     <!--Tab: Generate-->
-    <div id="sec-generate" class="section active">
+    <div id="sec-generate" class="section">
       <div class="card">
         <div class="form-grid">
           <div class="form-group">
@@ -943,8 +1359,10 @@ export const adminHtml = `<!DOCTYPE html>
     <div id="sec-manage" class="section">
       <div class="sticky-tools">
         <div class="search-bar" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:12px;">
-          <div class="search-input-wrap" style="flex:1; min-width:200px; max-width:300px;">
-            <input type="text" id="keywordSearch" placeholder="搜索卡密、用户名 (Ctrl+K)" oninput="debounceSearch()">
+          <!-- 搜索框 + 历史记录 -->
+          <div class="search-wrapper">
+            <input type="text" id="keywordSearch" placeholder="搜索卡密、用户名 (Ctrl+K)" oninput="debounceSearch()" onfocus="showSearchHistory()" onkeydown="handleSearchKeydown(event)">
+            <div id="searchHistoryDropdown" class="search-history-dropdown"></div>
           </div>
 
           <!-- 快速状态筛选 -->
@@ -973,14 +1391,91 @@ export const adminHtml = `<!DOCTYPE html>
               style="padding:6px; font-size:12px; border-radius:6px; background:#0d1117; color:var(--text-bright); border:1px solid var(--border-color); width:auto; max-width:180px;">
               <option value=""> 所有产品线(Show All) </option>
             </select>
+
+            <!-- 高级筛选按钮 -->
+            <button class="secondary" id="btnAdvancedFilter" onclick="toggleAdvancedFilter()" style="padding:4px 8px; font-size:12px;">🔍 高级</button>
+          </div>
+        </div>
+
+        <!-- 高级筛选区域 -->
+        <div id="advancedFilterSection" class="advanced-filter-section">
+          <div class="filter-row" style="margin-bottom:12px;">
+            <div class="filter-group">
+              <label>授权标识:</label>
+              <select id="filterLicenseType" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部类型</option>
+                <option value="standard">标准卡密</option>
+                <option value="offline">离线激活码</option>
+                <option value="long">长码(>30字符)</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>使用者:</label>
+              <select id="filterUserStatus" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部</option>
+                <option value="named">已指定用户</option>
+                <option value="unnamed">未指定用户</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>订阅产品:</label>
+              <select id="filterSubProduct" style="padding:4px 8px; font-size:12px; min-width:120px;">
+                <option value="">全部产品</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>有效期:</label>
+              <select id="filterSubExpiry" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部</option>
+                <option value="permanent">永久</option>
+                <option value="valid">有效订阅</option>
+                <option value="expiring7">7天内到期</option>
+                <option value="expiring30">30天内到期</option>
+                <option value="expired">已过期</option>
+                <option value="nosub">无订阅</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-group">
+              <label>创建时间:</label>
+              <input type="date" id="filterDateStart" style="padding:4px 8px; font-size:12px;">
+              <span style="color:var(--text-main);">至</span>
+              <input type="date" id="filterDateEnd" style="padding:4px 8px; font-size:12px;">
+            </div>
+            <div class="filter-group">
+              <label>设备占用:</label>
+              <select id="filterDeviceUsage" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部</option>
+                <option value="unused">未使用</option>
+                <option value="partial">有空余</option>
+                <option value="full">已满</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>离线特权:</label>
+              <select id="filterOfflinePriv" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部</option>
+                <option value="has">有离线特权</option>
+                <option value="none">无离线特权</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>AI特权:</label>
+              <select id="filterAiPriv" style="padding:4px 8px; font-size:12px;">
+                <option value="">全部</option>
+                <option value="has">有AI额度</option>
+                <option value="none">无AI额度</option>
+              </select>
+            </div>
+            <button class="secondary" onclick="applyAdvancedFilter()" style="padding:4px 12px; font-size:12px;">应用筛选</button>
+            <button class="secondary" onclick="resetAdvancedFilter()" style="padding:4px 12px; font-size:12px;">重置</button>
           </div>
         </div>
 
         <div style="display:flex; width:100%; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div style="display:flex; gap:8px;">
-            <button class="secondary" onclick="exportData()" style="padding:4px 8px; font-size:12px;">📤 导出JSON</button>
-            <button class="secondary" onclick="exportExcel()" style="padding:4px 8px; font-size:12px;">📊
-              导出Excel(CSV)</button>
+            <button class="secondary" onclick="showExportOptions()" style="padding:4px 8px; font-size:12px;">📤 导出</button>
             <button class="secondary" onclick="document.getElementById('importFile').click()"
               style="padding:4px 8px; font-size:12px;">📥 导入配置/CSV</button>
             <input type="file" id="importFile" accept=".json,.csv" style="display:none" onchange="importData(event)">
@@ -1225,6 +1720,387 @@ export const adminHtml = `<!DOCTYPE html>
 
     let modalResolve = null;
 
+    // ==========================================
+    // 新增优化功能：搜索历史、高级筛选、导出选项、批量操作增强
+    // ==========================================
+
+    // 搜索历史管理
+    let SEARCH_HISTORY = JSON.parse(localStorage.getItem('hw_search_history') || '[]');
+    const MAX_SEARCH_HISTORY = 10;
+
+    function saveSearchHistory(keyword) {
+      if (!keyword || keyword.trim().length < 2) return;
+      keyword = keyword.trim();
+      // 移除重复项
+      SEARCH_HISTORY = SEARCH_HISTORY.filter(h => h !== keyword);
+      // 添加到开头
+      SEARCH_HISTORY.unshift(keyword);
+      // 限制数量
+      if (SEARCH_HISTORY.length > MAX_SEARCH_HISTORY) {
+        SEARCH_HISTORY = SEARCH_HISTORY.slice(0, MAX_SEARCH_HISTORY);
+      }
+      localStorage.setItem('hw_search_history', JSON.stringify(SEARCH_HISTORY));
+    }
+
+    function showSearchHistory() {
+      const dropdown = document.getElementById('searchHistoryDropdown');
+      if (!dropdown || SEARCH_HISTORY.length === 0) {
+        if (dropdown) dropdown.classList.remove('active');
+        return;
+      }
+      let html = '<div class="search-history-header"><span>搜索历史</span><span class="clear-all" onclick="clearSearchHistory(event)">清空</span></div>';
+      SEARCH_HISTORY.forEach(h => {
+        html += '<div class="search-history-item" onclick="useSearchHistory(\\'' + escapeHTML(h).replace(/'/g, "\\\\'") + '\\')"><span class="history-text">' + escapeHTML(h) + '</span><span class="remove-history" onclick="removeSearchHistory(event, \\'' + escapeHTML(h).replace(/'/g, "\\\\'") + '\\')">✕</span></div>';
+      });
+      dropdown.innerHTML = html;
+      dropdown.classList.add('active');
+    }
+
+    function hideSearchHistory() {
+      setTimeout(() => {
+        const dropdown = document.getElementById('searchHistoryDropdown');
+        if (dropdown) dropdown.classList.remove('active');
+      }, 200);
+    }
+
+    function useSearchHistory(keyword) {
+      document.getElementById('keywordSearch').value = keyword;
+      hideSearchHistory();
+      filterLocalList(true);
+    }
+
+    function removeSearchHistory(event, keyword) {
+      event.stopPropagation();
+      SEARCH_HISTORY = SEARCH_HISTORY.filter(h => h !== keyword);
+      localStorage.setItem('hw_search_history', JSON.stringify(SEARCH_HISTORY));
+      showSearchHistory();
+    }
+
+    function clearSearchHistory(event) {
+      event.stopPropagation();
+      SEARCH_HISTORY = [];
+      localStorage.setItem('hw_search_history', JSON.stringify(SEARCH_HISTORY));
+      hideSearchHistory();
+    }
+
+    function handleSearchKeydown(event) {
+      if (event.key === 'Enter') {
+        const keyword = document.getElementById('keywordSearch').value.trim();
+        saveSearchHistory(keyword);
+        hideSearchHistory();
+        filterLocalList(true);
+      } else if (event.key === 'Escape') {
+        hideSearchHistory();
+      }
+    }
+
+    // 点击外部关闭搜索历史
+    document.addEventListener('click', (e) => {
+      const wrapper = document.querySelector('.search-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        hideSearchHistory();
+      }
+    });
+
+    // 高级筛选功能
+    let advancedFilterActive = false;
+
+    function toggleAdvancedFilter() {
+      const section = document.getElementById('advancedFilterSection');
+      const btn = document.getElementById('btnAdvancedFilter');
+      if (section) {
+        advancedFilterActive = !advancedFilterActive;
+        if (advancedFilterActive) {
+          section.classList.add('active');
+          btn.style.background = 'var(--accent)';
+          btn.style.color = '#fff';
+        } else {
+          section.classList.remove('active');
+          btn.style.background = '';
+          btn.style.color = '';
+        }
+      }
+    }
+
+    function applyAdvancedFilter() {
+      // 高级筛选参数会在 loadLicenses 中使用
+      filterLocalList(true);
+      showToast('高级筛选已应用', 'success');
+    }
+
+    function resetAdvancedFilter() {
+      document.getElementById('filterLicenseType').value = '';
+      document.getElementById('filterUserStatus').value = '';
+      document.getElementById('filterSubProduct').value = '';
+      document.getElementById('filterSubExpiry').value = '';
+      document.getElementById('filterDateStart').value = '';
+      document.getElementById('filterDateEnd').value = '';
+      document.getElementById('filterDeviceUsage').value = '';
+      document.getElementById('filterOfflinePriv').value = '';
+      document.getElementById('filterAiPriv').value = '';
+      filterLocalList(true);
+      showToast('高级筛选已重置', 'success');
+    }
+
+    function getAdvancedFilterParams() {
+      const params = {};
+      const licenseType = document.getElementById('filterLicenseType')?.value;
+      const userStatus = document.getElementById('filterUserStatus')?.value;
+      const subProduct = document.getElementById('filterSubProduct')?.value;
+      const subExpiry = document.getElementById('filterSubExpiry')?.value;
+      const dateStart = document.getElementById('filterDateStart')?.value;
+      const dateEnd = document.getElementById('filterDateEnd')?.value;
+      const deviceUsage = document.getElementById('filterDeviceUsage')?.value;
+      const offlinePriv = document.getElementById('filterOfflinePriv')?.value;
+      const aiPriv = document.getElementById('filterAiPriv')?.value;
+
+      if (licenseType) params.license_type = licenseType;
+      if (userStatus) params.user_status = userStatus;
+      if (subProduct) params.sub_product = subProduct;
+      if (subExpiry) params.sub_expiry = subExpiry;
+      if (dateStart) params.date_start = dateStart;
+      if (dateEnd) params.date_end = dateEnd;
+      if (deviceUsage) params.device_usage = deviceUsage;
+      if (offlinePriv) params.offline_priv = offlinePriv;
+      if (aiPriv) params.ai_priv = aiPriv;
+      return params;
+    }
+
+    // 导出选项对话框
+    const EXPORT_FIELDS = [
+      { key: 'license_key', label: '激活码', default: true },
+      { key: 'user_name', label: '用户备注', default: true },
+      { key: 'status', label: '状态', default: true },
+      { key: 'product_id', label: '主产品', default: true },
+      { key: 'max_devices', label: '设备配额', default: true },
+      { key: 'current_devices', label: '已用设备', default: true },
+      { key: 'subscriptions', label: '订阅详情', default: true },
+      { key: 'created_at', label: '创建时间', default: true },
+      { key: 'offline_days_override', label: '离线特权天数', default: false },
+      { key: 'ai_daily_quota', label: 'AI额度', default: false },
+      { key: 'ai_model_override', label: 'AI模型', default: false }
+    ];
+
+    async function showExportOptions() {
+      // 检查是否有数据
+      const totalItems = currentPagination?.total || ALL_LICENSES.length;
+      if (totalItems === 0) {
+        showModal({ title: '提示', message: '当前没有可导出的数据', type: 'alert' });
+        return;
+      }
+
+      // 构建导出选项界面
+      let fieldsHtml = '<div class="export-field-list">';
+      EXPORT_FIELDS.forEach(f => {
+        fieldsHtml += '<div class="export-field-item"><input type="checkbox" id="export_' + f.key + '"' + (f.default ? ' checked' : '') + '><label for="export_' + f.key + '">' + f.label + '</label></div>';
+      });
+      fieldsHtml += '</div>';
+
+      const result = await showModal({
+        title: '📊 导出选项',
+        message: '<p style="margin-bottom:12px;">当前筛选结果共 <strong>' + totalItems + '</strong> 条数据</p>' +
+          '<div style="margin-bottom:12px;"><label style="font-size:13px;"><input type="checkbox" id="exportAllData" checked> 导出当前筛选结果（取消则导出全部数据）</label></div>' +
+          '<p style="font-size:13px; margin-bottom:8px;">选择导出字段：</p>' + fieldsHtml +
+          '<div style="margin-top:12px;"><label style="font-size:13px;"><input type="radio" name="exportFormat" value="json" checked> JSON格式</label> <label style="font-size:13px; margin-left:16px;"><input type="radio" name="exportFormat" value="csv"> CSV格式</label></div>',
+        confirmText: '开始导出'
+      });
+
+      if (!result) return;
+
+      // 收集选项
+      const exportFiltered = document.getElementById('exportAllData')?.checked;
+      const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'json';
+      const selectedFields = EXPORT_FIELDS.filter(f => document.getElementById('export_' + f.key)?.checked);
+
+      if (selectedFields.length === 0) {
+        showToast('请至少选择一个导出字段', 'warning');
+        return;
+      }
+
+      // 执行导出
+      if (format === 'json') {
+        await exportDataWithOptions(exportFiltered, selectedFields);
+      } else {
+        await exportCSVWithOptions(exportFiltered, selectedFields);
+      }
+    }
+
+    async function exportDataWithOptions(exportFiltered, selectedFields) {
+      let dataToExport;
+
+      if (exportFiltered) {
+        // 导出当前筛选结果（需要从后端获取完整数据）
+        dataToExport = ALL_LICENSES;
+      } else {
+        // 导出全部数据
+        try {
+          showToast('正在获取全部数据...', 'warning');
+          const res = await fetch('/api/v1/auth/admin/licenses?limit=9999&page=1', {
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+          });
+          const data = await res.json();
+          if (data.success) {
+            dataToExport = data.data;
+          } else {
+            showToast('获取数据失败: ' + data.msg, 'error');
+            return;
+          }
+        } catch (e) {
+          showToast('网络错误: ' + e.message, 'error');
+          return;
+        }
+      }
+
+      // 只保留选中的字段
+      const filteredData = dataToExport.map(item => {
+        const newObj = {};
+        selectedFields.forEach(f => {
+          newObj[f.key] = item[f.key];
+        });
+        return newObj;
+      });
+
+      const dataStr = JSON.stringify(filteredData, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hw-licenses-export-' + Date.now() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('导出成功：' + filteredData.length + ' 条数据', 'success');
+    }
+
+    async function exportCSVWithOptions(exportFiltered, selectedFields) {
+      let dataToExport;
+
+      if (exportFiltered) {
+        dataToExport = ALL_LICENSES;
+      } else {
+        try {
+          showToast('正在获取全部数据...', 'warning');
+          const res = await fetch('/api/v1/auth/admin/licenses?limit=9999&page=1', {
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+          });
+          const data = await res.json();
+          if (data.success) {
+            dataToExport = data.data;
+          } else {
+            showToast('获取数据失败: ' + data.msg, 'error');
+            return;
+          }
+        } catch (e) {
+          showToast('网络错误: ' + e.message, 'error');
+          return;
+        }
+      }
+
+      // 构建 CSV
+      const headers = selectedFields.map(f => f.label);
+      let csvContent = headers.join(',') + '\\n';
+
+      dataToExport.forEach(item => {
+        const row = selectedFields.map(f => {
+          let val = item[f.key];
+          if (f.key === 'subscriptions' && Array.isArray(val)) {
+            val = val.map(s => '[' + s.product_id + ':' + (s.expires_at || '永久') + ']').join('|');
+          }
+          if (val === null || val === undefined) val = '';
+          // CSV 转义
+          const str = String(val).replace(/"/g, '""');
+          return '"' + str + '"';
+        });
+        csvContent += row.join(',') + '\\n';
+      });
+
+      const blob = new Blob(['\\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hw-licenses-export-' + Date.now() + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('导出成功：' + dataToExport.length + ' 条数据', 'success');
+    }
+
+    // 批量操作进度显示
+    function showBatchProgress(title, current, total) {
+      let overlay = document.getElementById('batchProgressOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'batchProgressOverlay';
+        overlay.className = 'batch-progress-overlay';
+        overlay.innerHTML = '<div class="batch-progress-card"><h3 id="batchProgressTitle"></h3><div class="batch-progress-bar"><div class="progress-fill" id="batchProgressFill"></div></div><div class="batch-progress-text" id="batchProgressText"></div></div>';
+        document.body.appendChild(overlay);
+      }
+      document.getElementById('batchProgressTitle').innerText = title;
+      document.getElementById('batchProgressFill').style.width = (current / total * 100) + '%';
+      document.getElementById('batchProgressText').innerText = current + ' / ' + total;
+      overlay.style.display = 'flex';
+    }
+
+    function updateBatchProgress(current, total) {
+      document.getElementById('batchProgressFill').style.width = (current / total * 100) + '%';
+      document.getElementById('batchProgressText').innerText = current + ' / ' + total;
+    }
+
+    function hideBatchProgress() {
+      const overlay = document.getElementById('batchProgressOverlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+
+    // 统计数据缓存
+    let statsCache = null;
+    let statsCacheTime = 0;
+    const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
+    async function getStatsWithCache(forceRefresh = false) {
+      const now = Date.now();
+      if (!forceRefresh && statsCache && (now - statsCacheTime) < STATS_CACHE_DURATION) {
+        return statsCache;
+      }
+      // 从 loadLicenses 的返回值中获取
+      return statsCache;
+    }
+
+    // 用户头像颜色哈希
+    function getAvatarColor(name) {
+      if (!name) return '#30363d';
+      const colors = ['#58a6ff', '#3fb950', '#f85149', '#d29922', '#a371f7', '#f778ba', '#79c0ff', '#56d4dd', '#e3b341'];
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return colors[Math.abs(hash) % colors.length];
+    }
+
+    // 统一请求封装
+    async function apiRequest(endpoint, options = {}) {
+      const defaultOptions = {
+        headers: {
+          'Authorization': 'Bearer ' + ADMIN_SECRET,
+          'Content-Type': 'application/json'
+        }
+      };
+      const mergedOptions = { ...defaultOptions, ...options };
+      mergedOptions.headers = { ...defaultOptions.headers, ...options.headers };
+
+      const res = await fetch(endpoint, mergedOptions);
+      const data = await res.json();
+
+      if (res.status === 401) {
+        logout();
+        showModal({ title: '会话失效', message: '密钥无效或已更改，请重新输入', type: 'alert' });
+        throw new Error('Unauthorized');
+      }
+
+      return { res, data };
+    }
+
     function showToast(message, type = 'success') {
       let container = document.getElementById('toastContainer');
       if (!container) {
@@ -1315,32 +2191,35 @@ export const adminHtml = `<!DOCTYPE html>
       btn.innerText = '验证中...';
 
       try {
-        const res = await fetch('/api/v1/auth/admin/licenses?product_id=', {
+        const res = await fetch('/api/v1/auth/admin/licenses?limit=1', {
           headers: { 'Authorization': 'Bearer ' + s }
         });
 
-        if (!res.ok) {
+        if (res.status === 401) {
           showToast('密钥无效，请检查', 'error');
-          throw new Error();
+          btn.disabled = false;
+          btn.innerText = originalText;
+          return;
         }
+
+        if (!res.ok) {
+          showToast('服务器响应异常: ' + res.status, 'error');
+          btn.disabled = false;
+          btn.innerText = originalText;
+          return;
+        }
+
+        const data = await res.json();
 
         ADMIN_SECRET = s;
         localStorage.setItem('hw_admin_secret', s);
         document.getElementById('adminAuth').style.display = 'none';
-        loadLicenses();
+        loadDashboard(); // 加载看板数据
         loadSettings(); // 并行加载全局配置并同步默认值到生卡面板
       } catch (e) {
-        // 请求失败自动恢复按钮状态
-        if (e.message !== '') {
-          showToast('网络或连接异常: ' + e.message, 'error');
-        } else {
-          // 由 response.ok !== true 抛出的空 Error
-        }
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerText = originalText;
-        }
+        showToast('网络或连接异常: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.innerText = originalText;
       }
     }
 
@@ -1366,20 +2245,387 @@ export const adminHtml = `<!DOCTYPE html>
     // 回车快捷登录
     document.getElementById('globalSecret').onkeyup = (e) => { if (e.key === 'Enter') login(); };
 
+    let currentTab = 'dashboard';
+
     function switchTab(tab) {
+      currentTab = tab;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       const target = (event && event.target) ? event.target : document.querySelector('.tab[onclick*="' + tab + '"]');
       if (target) target.classList.add('active');
       document.getElementById('sec-' + tab).classList.add('active');
+      if (tab === 'dashboard') loadDashboard();
       if (tab === 'manage') loadLicenses();
       if (tab === 'settings') loadSettings();
       if (tab === 'notifications') loadNotifications();
       // 在标签切换时同步更新底栏可见性，防全局遮挡
       if (typeof updateBatchBar === 'function') updateBatchBar();
-      
+
       // 切换标签后，高度可能因不同面板的内容而变化，触发同步
       setTimeout(syncStickyHeights, 50);
+    }
+
+    function refreshCurrentTab() {
+      switchTab(currentTab);
+      showToast('已刷新', 'success');
+    }
+
+    // 从看板跳转到资产管理并筛选状态
+    function filterByStatus(status) {
+      switchTab('manage');
+      setTimeout(() => {
+        if (status === 'expiring') {
+          filterStatus('expiring', document.getElementById('btnFilterExpiring'));
+        } else {
+          const btns = document.querySelectorAll('#statusFilterGroup button');
+          btns.forEach(b => {
+            if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + status + "'")) {
+              filterStatus(status, b);
+            }
+          });
+        }
+      }, 100);
+    }
+
+    // 加载看板数据
+    async function loadDashboard() {
+      // 更新时间
+      const timeEl = document.getElementById('dashboardUpdateTime');
+      if (timeEl) timeEl.innerText = '更新于 ' + new Date().toLocaleTimeString();
+
+      try {
+        // 获取基础统计数据
+        const res = await fetch('/api/v1/auth/admin/licenses?limit=1', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          updateStats(data.stats);
+          await loadDashboardDetails(data.stats);
+        }
+      } catch (e) {
+        console.error('Load dashboard error:', e);
+      }
+    }
+
+    // 渲染状态分布图 (环形图 + 图例)
+    function renderStatusChart(stats) {
+      const container = document.getElementById('statusChart');
+      if (!container || !stats) return;
+
+      const total = stats.total || 0;
+      if (total === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-main); padding:20px;">暂无数据</div>';
+        return;
+      }
+
+      const active = stats.active || 0;
+      const revoked = stats.revoked || 0;
+      const expiring = stats.expiring || 0;
+
+      // 计算百分比
+      const activePct = Math.round(active / total * 100);
+      const revokedPct = Math.round(revoked / total * 100);
+      const expiringPct = Math.round(expiring / total * 100);
+
+      // conic-gradient 颜色和角度
+      // active=绿色, expiring=橙色, revoked=红色, 其他=灰色
+      const others = total - active - revoked - expiring;
+      const othersPct = others > 0 ? Math.round(others / total * 100) : 0;
+
+      // 构建渐变
+      let gradients = [];
+      let currentAngle = 0;
+
+      if (active > 0) {
+        gradients.push(\`var(--success) \${currentAngle}deg \${currentAngle + activePct * 3.6}deg\`);
+        currentAngle += activePct * 3.6;
+      }
+      if (expiring > 0) {
+        gradients.push(\`var(--warning) \${currentAngle}deg \${currentAngle + expiringPct * 3.6}deg\`);
+        currentAngle += expiringPct * 3.6;
+      }
+      if (revoked > 0) {
+        gradients.push(\`var(--danger) \${currentAngle}deg \${currentAngle + revokedPct * 3.6}deg\`);
+        currentAngle += revokedPct * 3.6;
+      }
+      if (others > 0) {
+        gradients.push(\`var(--text-main) \${currentAngle}deg \${currentAngle + othersPct * 3.6}deg\`);
+      }
+
+      const gradientStr = gradients.length > 0 ? gradients.join(', ') : 'var(--border-color) 0deg 360deg';
+
+      container.innerHTML = \`
+        <div class="chart-container">
+          <div class="donut-chart" style="border-radius:50%; background: conic-gradient(\${gradientStr});">
+            <div class="donut-center" style="width:80px; height:80px; background:var(--card-bg); border-radius:50%;">
+              <div class="donut-value">\${total}</div>
+              <div class="donut-label">总卡密</div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background:var(--success);"></div>
+              <span>有效 <b>\${active}</b> (\${activePct}%)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background:var(--warning);"></div>
+              <span>临期 <b>\${expiring}</b> (\${expiringPct}%)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background:var(--danger);"></div>
+              <span>已撤销 <b>\${revoked}</b> (\${revokedPct}%)</span>
+            </div>
+            \${others > 0 ? \`
+            <div class="legend-item">
+              <div class="legend-color" style="background:var(--text-main);"></div>
+              <span>其他 <b>\${others}</b> (\${othersPct}%)</span>
+            </div>
+            \` : ''}
+          </div>
+        </div>
+      \`;
+    }
+
+    // 加载看板详细统计
+    async function loadDashboardDetails(stats) {
+      // 状态分布图
+      if (stats) {
+        renderStatusChart(stats);
+      }
+
+      // 设备使用情况
+      const deviceUsageHtml = await getDeviceUsageHtml();
+      const deviceEl = document.getElementById('deviceUsageStats');
+      if (deviceEl) deviceEl.innerHTML = deviceUsageHtml;
+
+      // 产品分布
+      const productDistHtml = await getProductDistHtml();
+      const productEl = document.getElementById('productDistStats');
+      if (productEl) productEl.innerHTML = productDistHtml;
+
+      // 订阅状态
+      const subscriptionHtml = await getSubscriptionHtml();
+      const subEl = document.getElementById('subscriptionStats');
+      if (subEl) subEl.innerHTML = subscriptionHtml;
+
+      // 特权统计
+      const privilegeHtml = await getPrivilegeHtml();
+      const privEl = document.getElementById('privilegeStats');
+      if (privEl) privEl.innerHTML = privilegeHtml;
+    }
+
+    async function getDeviceUsageHtml() {
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
+
+        const licenses = data.data;
+        let unused = 0, partial = 0, full = 0;
+        let totalDevices = 0, totalQuota = 0;
+
+        licenses.forEach(l => {
+          const used = l.current_devices || 0;
+          const max = l.max_devices || 1;
+          totalDevices += used;
+          totalQuota += max;
+          if (used === 0) unused++;
+          else if (used >= max) full++;
+          else partial++;
+        });
+
+        const usagePct = totalQuota > 0 ? Math.round(totalDevices / totalQuota * 100) : 0;
+
+        return \`
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span style="color:var(--text-main);">总设备配额</span>
+              <span style="font-weight:600;">\${totalDevices} / \${totalQuota} 台</span>
+            </div>
+            <div style="height:8px; background:var(--border-color); border-radius:4px; overflow:hidden;">
+              <div style="width:\${usagePct}%; height:100%; background:var(--accent);"></div>
+            </div>
+            <div style="text-align:right; font-size:11px; color:var(--text-main); margin-top:4px;">使用率 \${usagePct}%</div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:20px; font-weight:700; color:var(--text-bright);">\${unused}</div>
+              <div style="font-size:11px; color:var(--text-main);">未使用</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:20px; font-weight:700; color:var(--warning);">\${partial}</div>
+              <div style="font-size:11px; color:var(--text-main);">使用中</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:20px; font-weight:700; color:var(--danger);">\${full}</div>
+              <div style="font-size:11px; color:var(--text-main);">已满</div>
+            </div>
+          </div>
+        \`;
+      } catch (e) {
+        return '<div style="color:var(--danger);">加载失败</div>';
+      }
+    }
+
+    async function getProductDistHtml() {
+      try {
+        const res = await fetch('/api/v1/auth/admin/products', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+
+        const licRes = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const licData = await licRes.json();
+
+        if (!data.success || !licData.success) return '<div style="color:var(--danger);">加载失败</div>';
+
+        // 统计每个产品的卡密数
+        const productCount = {};
+        licData.data.forEach(l => {
+          const pid = l.product_id || 'default';
+          productCount[pid] = (productCount[pid] || 0) + 1;
+        });
+
+        const sorted = Object.entries(productCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const total = licData.data.length || 1;
+
+        if (sorted.length === 0) return '<div style="color:var(--text-main); text-align:center; padding:20px;">暂无数据</div>';
+
+        let html = '';
+        sorted.forEach(([pid, count]) => {
+          const pct = Math.round(count / total * 100);
+          html += \`
+            <div style="margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                <span style="color:var(--text-bright);">\${pid}</span>
+                <span style="color:var(--text-main);">\${count} 个 (\${pct}%)</span>
+              </div>
+              <div style="height:6px; background:var(--border-color); border-radius:3px; overflow:hidden;">
+                <div style="width:\${pct}%; height:100%; background:var(--accent);"></div>
+              </div>
+            </div>
+          \`;
+        });
+
+        return html;
+      } catch (e) {
+        return '<div style="color:var(--danger);">加载失败</div>';
+      }
+    }
+
+    async function getSubscriptionHtml() {
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
+
+        const now = new Date();
+        let permanent = 0, valid = 0, expiring7 = 0, expiring30 = 0, expired = 0, nosub = 0;
+
+        data.data.forEach(l => {
+          if (!l.subscriptions || l.subscriptions.length === 0) {
+            nosub++;
+            return;
+          }
+
+          let hasPermanent = false, hasValid = false, hasExpiring7 = false, hasExpiring30 = false, hasExpired = false;
+
+          l.subscriptions.forEach(s => {
+            if (!s.expires_at) {
+              hasPermanent = true;
+            } else {
+              const expDate = new Date(s.expires_at);
+              const days = Math.ceil((expDate - now) / 86400000);
+              if (days <= 0) hasExpired = true;
+              else if (days <= 7) hasExpiring7 = true;
+              else if (days <= 30) hasExpiring30 = true;
+              else hasValid = true;
+            }
+          });
+
+          if (hasPermanent) permanent++;
+          if (hasValid) valid++;
+          if (hasExpiring7) expiring7++;
+          if (hasExpiring30) expiring30++;
+          if (hasExpired) expired++;
+        });
+
+        return \`
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:var(--success);">\${permanent}</div>
+              <div style="font-size:10px; color:var(--text-main);">永久</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:var(--accent);">\${valid}</div>
+              <div style="font-size:10px; color:var(--text-main);">有效</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:var(--text-bright);">\${nosub}</div>
+              <div style="font-size:10px; color:var(--text-main);">无订阅</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:var(--warning);">\${expiring7}</div>
+              <div style="font-size:10px; color:var(--text-main);">7天内到期</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:#d29922;">\${expiring30}</div>
+              <div style="font-size:10px; color:var(--text-main);">30天内到期</div>
+            </div>
+            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
+              <div style="font-size:18px; font-weight:700; color:var(--danger);">\${expired}</div>
+              <div style="font-size:10px; color:var(--text-main);">已过期</div>
+            </div>
+          </div>
+        \`;
+      } catch (e) {
+        return '<div style="color:var(--danger);">加载失败</div>';
+      }
+    }
+
+    async function getPrivilegeHtml() {
+      try {
+        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
+
+        let offlinePriv = 0, aiPriv = 0, aiModelPriv = 0;
+
+        data.data.forEach(l => {
+          if (l.offline_days_override != null) offlinePriv++;
+          if (l.ai_daily_quota != null && l.ai_daily_quota > 0) aiPriv++;
+          if (l.ai_model_override || l.ai_base_override) aiModelPriv++;
+        });
+
+        return \`
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--card-bg); border-radius:6px;">
+              <span style="font-size:13px; color:var(--text-bright);">⚡ 离线特权卡密</span>
+              <span style="font-weight:700; color:#6c5ce7;">\${offlinePriv} 个</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--card-bg); border-radius:6px;">
+              <span style="font-size:13px; color:var(--text-bright);">🤖 AI 专属额度</span>
+              <span style="font-weight:700; color:var(--accent);">\${aiPriv} 个</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--card-bg); border-radius:6px;">
+              <span style="font-size:13px; color:var(--text-bright);">👑 专属模型配置</span>
+              <span style="font-weight:700; color:var(--warning);">\${aiModelPriv} 个</span>
+            </div>
+          </div>
+        \`;
+      } catch (e) {
+        return '<div style="color:var(--danger);">加载失败</div>';
+      }
     }
 
     function syncStickyHeights() {
@@ -1619,6 +2865,7 @@ export const adminHtml = `<!DOCTYPE html>
     // 更新产品辅助器（包括筛选下拉和自定义生卡下拉框）
     function updateProductHelpers() {
       const filterSelect = document.getElementById('filterProductId');
+      const subProductSelect = document.getElementById('filterSubProduct');
       const dropdown = document.getElementById('productDropdown');
       const genInput = document.getElementById('genProductId');
 
@@ -1634,9 +2881,9 @@ export const adminHtml = `<!DOCTYPE html>
         }
       });
 
-      // 2. 更新管理列表上方的“筛选”下拉框
+      // 2. 更新管理列表上方的”筛选”下拉框
       const currentFilter = filterSelect.value;
-      filterSelect.innerHTML = '<option value="">所有产品线 (Show All)</option>';
+      filterSelect.innerHTML = '<option value=””>所有产品线 (Show All)</option>';
       [...PRODUCT_HISTORY].sort().forEach(p => {
         const opt = document.createElement('option');
         opt.value = p; opt.innerText = p;
@@ -1644,18 +2891,30 @@ export const adminHtml = `<!DOCTYPE html>
       });
       filterSelect.value = currentFilter;
 
-      // 3. 更新生卡区的“自定义搜索下拉框”
+      // 3. 更新高级筛选区域的”订阅产品”下拉框
+      if (subProductSelect) {
+        const currentSubFilter = subProductSelect.value;
+        subProductSelect.innerHTML = '<option value=””>全部产品</option>';
+        [...PRODUCT_HISTORY].sort().forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p; opt.innerText = p;
+          subProductSelect.appendChild(opt);
+        });
+        subProductSelect.value = currentSubFilter;
+      }
+
+      // 4. 更新生卡区的”自定义搜索下拉框”
       const searchVal = genInput.value.toLowerCase();
       const matches = [...PRODUCT_HISTORY].filter(p => !searchVal || p.toLowerCase().includes(searchVal)).sort();
 
       if (matches.length === 0) {
-        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">未找到匹配的历史记录</div>';
+        dropdown.innerHTML = '<div style=”padding:12px; font-size:12px; color:var(--text-main); text-align:center;”>未找到匹配的历史记录</div>';
       } else {
         let listHtml = '';
         matches.forEach(p => {
-          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${p}')">\` +
+          listHtml += \`<div class=”dropdown-item” onclick=”setGenProduct('\${p}')”>\` +
             \`<span>\${p}</span>\` +
-            \`<div class="remove-btn" onclick="removeFromHistory(event, '\${p}')" title="从历史中移除">✕</div>\` +
+            \`<div class=”remove-btn” onclick=”removeFromHistory(event, '\${p}')” title=”从历史中移除”>✕</div>\` +
             \`</div>\`;
         });
         dropdown.innerHTML = listHtml;
@@ -1675,6 +2934,11 @@ export const adminHtml = `<!DOCTYPE html>
       const pId = document.getElementById('filterProductId') ? document.getElementById('filterProductId').value : '';
       const container = document.getElementById('licListContainer');
 
+      // 保存搜索历史
+      if (searchKw) {
+        saveSearchHistory(searchKw);
+      }
+
       const queryParams = new URLSearchParams({
         page: currentPage,
         limit: PAGE_SIZE,
@@ -1682,6 +2946,12 @@ export const adminHtml = `<!DOCTYPE html>
         product_id: pId,
         status: currentStatusFilter,
         sort: currentSort
+      });
+
+      // 添加高级筛选参数
+      const advFilters = getAdvancedFilterParams();
+      Object.entries(advFilters).forEach(([key, value]) => {
+        queryParams.append(key, String(value));
       });
 
       // 零状态时给大占位符，有数据增量时使用轻微透明度保护乐观UI
@@ -1711,12 +2981,17 @@ export const adminHtml = `<!DOCTYPE html>
 
         ALL_LICENSES = data.data; // 降级为仅缓存当前页数组，用于热变更映射
         currentPagination = data.pagination;
-        currentStats = data.stats;
 
-        updateStats(currentStats);
+        // 统计数据缓存（5分钟有效）
+        if (data.stats) {
+          statsCache = data.stats;
+          statsCacheTime = Date.now();
+        }
+
+        updateStats(data.stats);
         updateProductHelpers();
         renderCards(ALL_LICENSES, currentPagination);
-        
+
         // 数据加载完成后，重新计算可能因内容长短影响的高度
         setTimeout(syncStickyHeights, 100);
       } catch (e) {
@@ -1733,8 +3008,27 @@ export const adminHtml = `<!DOCTYPE html>
     // 渲染列表视图布局
     function renderCards(list, pagination = null) {
       const container = document.getElementById('licListContainer');
+
+      // 同步分页元数据为组件作用域变量
+      const totalPages = pagination ? pagination.total_pages : 1;
+      const totalItems = pagination ? pagination.total : list.length;
+
+      // 空状态优化：添加引导按钮
       if (list.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">📭 暂无相关卡密数据</div>';
+        const hasFilters = currentStatusFilter !== 'all' ||
+          document.getElementById('keywordSearch')?.value.trim() ||
+          document.getElementById('filterProductId')?.value;
+
+        let emptyHtml = '<div style="text-align:center; padding:60px 20px;">';
+        emptyHtml += '<div style="font-size:48px; margin-bottom:16px;">📭</div>';
+        emptyHtml += '<div style="font-size:16px; color:var(--text-bright); margin-bottom:8px;">' + (hasFilters ? '未找到匹配的卡密' : '暂无卡密数据') + '</div>';
+        emptyHtml += '<div style="font-size:13px; color:var(--text-main); margin-bottom:20px;">' + (hasFilters ? '尝试调整筛选条件或清除搜索' : '点击下方按钮开始生成第一个激活码') + '</div>';
+        if (hasFilters) {
+          emptyHtml += '<button class="secondary" onclick="resetAllFilters()" style="margin-right:8px;">🔄 重置筛选</button>';
+        }
+        emptyHtml += '<button class="primary" onclick="switchTab(\\'generate\\')">✨ 立即生成激活码</button>';
+        emptyHtml += '</div>';
+        container.innerHTML = emptyHtml;
         const topPag = document.getElementById('topPagination');
         if (topPag) topPag.innerHTML = '';
         return;
@@ -1762,17 +3056,18 @@ export const adminHtml = `<!DOCTYPE html>
 
       const now = new Date();
 
-      // 同步分页元数据为组件作用域变量
-      const totalPages = pagination ? pagination.total_pages : 1;
-      const totalItems = pagination ? pagination.total : list.length;
       if (currentPage > totalPages) currentPage = totalPages;
       if (currentPage < 1) currentPage = 1;
 
       pagedList.forEach((lic) => {
-        // 准备订阅状态 HTML
+        // 准备订阅状态 HTML（折叠显示优化）
         let subHtml = '';
+        const MAX_VISIBLE_SUBS = 3;
         if (lic.subscriptions && lic.subscriptions.length > 0) {
-          subHtml = lic.subscriptions.map((s) => {
+          const visibleSubs = lic.subscriptions.slice(0, MAX_VISIBLE_SUBS);
+          const hiddenCount = lic.subscriptions.length - MAX_VISIBLE_SUBS;
+
+          visibleSubs.forEach((s) => {
             let text = '永 久';
             let cls = 'badge-success';
             if (s.expires_at) {
@@ -1780,8 +3075,15 @@ export const adminHtml = `<!DOCTYPE html>
               text = days > 0 ? '剩 ' + days + ' 天' : '已过期';
               cls = days > 7 ? 'badge-success' : (days > 0 ? 'badge-warning' : 'badge-danger');
             }
-            return '<span class="badge ' + cls + '" style="margin-right:4px;">' + s.product_id + ': ' + text + '</span>';
-          }).join('');
+            subHtml += '<span class="badge ' + cls + '" style="margin-right:4px;">' + s.product_id + ': ' + text + '</span>';
+          });
+
+          // 折叠显示更多订阅
+          if (hiddenCount > 0) {
+            const hiddenSubs = lic.subscriptions.slice(MAX_VISIBLE_SUBS);
+            const tooltip = hiddenSubs.map(s => s.product_id + ': ' + (s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '永久')).join('\\n');
+            subHtml += '<span class="badge" style="background:var(--card-bg); color:var(--text-main); cursor:help;" title="' + tooltip + '">+' + hiddenCount + '</span>';
+          }
         } else {
           subHtml = '<span style="color:var(--text-main); font-size:11px; font-style:italic">暂无订阅产品</span>';
         }
@@ -1789,16 +3091,19 @@ export const adminHtml = `<!DOCTYPE html>
         const isRevoked = lic.status === 'revoked';
         const devicePct = Math.min(100, (lic.current_devices / lic.max_devices) * 100);
 
+        // 用户头像颜色哈希
+        const avatarColor = getAvatarColor(lic.user_name);
+
         html += \`
-      <div class="lic-row" style="grid-template-columns: 30px 1.5fr 1.5fr 1fr 1fr;">
+      <div class="lic-row" style="grid-template-columns: 30px 1.5fr 1.5fr 1fr 1fr;\${isRevoked ? ' opacity:0.6;' : ''}">
         <!-- Col 0: Checkbox -->
         <div style="display:flex; align-items:center;">
           <input type="checkbox" class="custom-checkbox row-checkbox" value="\${lic.license_key}" \${SET_SELECTED_KEYS.has(lic.license_key) ? 'checked' : ''} onclick="toggleBatchItem('\${lic.license_key}', this.checked)">
         </div>
-        
+
         <!-- Col 1: 基本信息 -->
         <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-          <div style="width:36px; height:36px; flex-shrink:0; background:#30363d; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:14px;">
+          <div style="width:36px; height:36px; flex-shrink:0; background:\${avatarColor}; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:14px;">
             \${(lic.user_name || '?')[0].toUpperCase()}
           </div>
           <div style="min-width:0; overflow:hidden;">
@@ -1813,7 +3118,7 @@ export const adminHtml = `<!DOCTYPE html>
             </div>
           </div>
         </div>
-        
+
         <!-- Col 2: 订阅标签与特权 -->
         <div style="font-size:12px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
           \${subHtml}
@@ -1836,7 +3141,7 @@ export const adminHtml = `<!DOCTYPE html>
             <button class="secondary" onclick="toggleDevicePanel('\${lic.license_key}')" style="margin-left:6px; padding:2px 6px; font-size:11px; height:auto; background:var(--panel-bg); border-color:#30363d; flex-shrink:0;" title="展开查看具体设备">🔍 详情</button>
           </div>
           <div style="height:4px; width:100%; max-width:80px; background:#30363d; border-radius:2px; overflow:hidden;">
-            <div style="width:\${devicePct}%; height:100%; background:var(--accent);"></div>
+            <div style="width:\${devicePct}%; height:100%; background:\${devicePct >= 100 ? 'var(--danger)' : devicePct >= 80 ? 'var(--warning)' : 'var(--accent)'};"></div>
           </div>
         </div>
 
@@ -1872,7 +3177,7 @@ export const adminHtml = `<!DOCTYPE html>
             </select>
             <button class="secondary" style="white-space:nowrap; flex-shrink:0;" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>← 上一页</button>
             <div style="display:flex; align-items:center; padding:0 12px; font-size:14px; color:var(--text-main); background:var(--card-bg); border-radius:6px; border:1px solid var(--border-color); white-space:nowrap; flex-shrink:0;">
-              第 <input type="number" id="quickPageInput" value="\${currentPage}" 
+              第 <input type="number" id="quickPageInput" value="\${currentPage}"
                 style="width: 40px; text-align: center; padding: 2px 0; margin: 0 6px; background: transparent; border: none; color: var(--accent); font-weight: bold; font-size: 14px; border-bottom: 1px dashed var(--border-color); border-radius: 0; outline: none; -moz-appearance: textfield;"
                 title="输入页数后回车跳转"
                 onkeypress="if(event.key==='Enter') quickJumpPage(this, \${totalPages})"> / <span style="margin-left:4px;">\${totalPages} 页</span>
@@ -1888,6 +3193,22 @@ export const adminHtml = `<!DOCTYPE html>
       }
 
       container.innerHTML = html;
+    }
+
+    // 重置所有筛选
+    function resetAllFilters() {
+      document.getElementById('keywordSearch').value = '';
+      document.getElementById('filterProductId').value = '';
+      if (document.getElementById('filterLicenseType')) document.getElementById('filterLicenseType').value = '';
+      if (document.getElementById('filterUserStatus')) document.getElementById('filterUserStatus').value = '';
+      if (document.getElementById('filterSubProduct')) document.getElementById('filterSubProduct').value = '';
+      if (document.getElementById('filterSubExpiry')) document.getElementById('filterSubExpiry').value = '';
+      if (document.getElementById('filterDateStart')) document.getElementById('filterDateStart').value = '';
+      if (document.getElementById('filterDateEnd')) document.getElementById('filterDateEnd').value = '';
+      if (document.getElementById('filterDeviceUsage')) document.getElementById('filterDeviceUsage').value = '';
+      if (document.getElementById('filterOfflinePriv')) document.getElementById('filterOfflinePriv').value = '';
+      if (document.getElementById('filterAiPriv')) document.getElementById('filterAiPriv').value = '';
+      filterStatus('all', document.querySelector('#statusFilterGroup button'));
     }
 
     // 切换分页大小
@@ -2570,6 +3891,15 @@ export const adminHtml = `<!DOCTYPE html>
         }
       });
       updateBatchBar();
+
+      // 跨页全选提示
+      const totalItems = currentPagination?.total || 0;
+      if (isChecked && totalItems > PAGE_SIZE) {
+        const remainingPages = Math.ceil(totalItems / PAGE_SIZE) - 1;
+        if (remainingPages > 0) {
+          showToast(\`已选中当前页 \${PAGE_SIZE} 项，还有 \${remainingPages} 页数据可全选\`, 'warning');
+        }
+      }
     }
 
     function clearBatchSelection() {
@@ -2580,26 +3910,61 @@ export const adminHtml = `<!DOCTYPE html>
       updateBatchBar();
     }
 
-    // 全选当前筛选结果
-    function selectAllFiltered() {
-      const kw = document.getElementById('keywordSearch').value.toLowerCase();
-      const pId = document.getElementById('filterProductId').value;
+    // 跨页全选（选中所有筛选结果）
+    async function selectAllAcrossPages() {
+      const totalItems = currentPagination?.total || 0;
+      if (totalItems === 0) return;
 
-      let filtered = ALL_LICENSES.filter(l => {
-        const matchKeyword = !kw ||
-          l.license_key.toLowerCase().includes(kw) ||
-          (l.user_name && l.user_name.toLowerCase().includes(kw));
-        const matchProduct = !pId || l.product_id === pId;
-        let matchStatus = true;
-        if (currentStatusFilter === 'active') matchStatus = l.status === 'active';
-        else if (currentStatusFilter === 'revoked') matchStatus = l.status === 'revoked';
-        return matchKeyword && matchProduct && matchStatus;
+      // 获取当前筛选条件
+      const searchKw = document.getElementById('keywordSearch')?.value.trim() || '';
+      const pId = document.getElementById('filterProductId')?.value || '';
+      const advFilters = getAdvancedFilterParams();
+
+      const confirmed = await showModal({
+        title: '跨页全选确认',
+        message: \`将选中所有符合当前筛选条件的 \${totalItems} 条数据，确认继续？\`,
+        confirmText: '确认全选'
       });
+      if (!confirmed) return;
 
-      filtered.forEach(l => SET_SELECTED_KEYS.add(l.license_key));
-      filterLocalList(false); // 触发重新渲染以回显勾选
+      showToast('正在获取全部数据...', 'warning');
+
+      try {
+        // 构建请求参数
+        const queryParams = new URLSearchParams({
+          limit: '9999',
+          page: '1',
+          search: searchKw,
+          product_id: pId,
+          status: currentStatusFilter,
+          sort: currentSort
+        });
+        Object.entries(advFilters).forEach(([key, value]) => {
+          queryParams.append(key, String(value));
+        });
+
+        const res = await fetch('/api/v1/auth/admin/licenses?' + queryParams.toString(), {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        });
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          data.data.forEach(l => SET_SELECTED_KEYS.add(l.license_key));
+          reRenderCards();
+          updateBatchBar();
+          showToast(\`已选中全部 \${data.data.length} 条数据\`, 'success');
+        }
+      } catch (e) {
+        showToast('获取数据失败: ' + e.message, 'error');
+      }
+    }
+
+    // 全选当前筛选结果（当前页）
+    function selectAllFiltered() {
+      ALL_LICENSES.forEach(l => SET_SELECTED_KEYS.add(l.license_key));
+      reRenderCards();
       updateBatchBar();
-      showToast(\`已全选当前视图下的 \${filtered.length} 个结果。\`, 'success');
+      showToast(\`已全选当前页 \${ALL_LICENSES.length} 个结果。\`, 'success');
     }
 
     // 极简化的批量执行流程（零动画、无阻塞提示响应）
@@ -2630,9 +3995,17 @@ export const adminHtml = `<!DOCTYPE html>
       }
 
       const optionText = actionSelect.options[actionSelect.selectedIndex].text.replace(/^[\\u0000-\\uFFFF]{1,3}\\s/, '');
+
+      // 批量操作预览
+      let previewMsg = \`🚀 最终确认：是否对 \${keys.length} 个卡密执行 [\${optionText}] 操作？\`;
+      if (keys.length > 50) {
+        const moreText = keys.length > 100 ? '<br>... 还有 ' + (keys.length - 100) + ' 个' : '';
+        previewMsg += '<br><br><details><summary style="cursor:pointer; color:var(--accent);">查看选中的卡密列表</summary><div style="max-height:150px; overflow-y:auto; margin-top:8px; font-family:monospace; font-size:11px; background:#0d1117; padding:8px; border-radius:4px;">' + keys.slice(0, 100).join('<br>') + moreText + '</div></details>';
+      }
+
       const confirmed = await showModal({
         title: '批量操作确认',
-        message: \`🚀 最终确认：是否对 \${keys.length} 个卡密执行 [\${optionText}] 操作？\`,
+        message: previewMsg,
         confirmText: '确定执行',
         danger: true
       });
@@ -2741,6 +4114,12 @@ export const adminHtml = `<!DOCTYPE html>
         params.product_id = res[0];
       }
 
+      // 大批量操作时显示进度条
+      const showProgress = keys.length > 100;
+      if (showProgress) {
+        showBatchProgress('正在执行批量操作...', 0, keys.length);
+      }
+
       try {
         const res = await fetch('/api/v1/auth/admin/licenses/batch', {
           method: 'POST',
@@ -2752,6 +4131,10 @@ export const adminHtml = `<!DOCTYPE html>
         });
         const data = await res.json();
 
+        if (showProgress) {
+          hideBatchProgress();
+        }
+
         if (data.success) {
           clearBatchSelection();
           showToast(data.msg, 'success');
@@ -2760,6 +4143,9 @@ export const adminHtml = `<!DOCTYPE html>
           showToast('执行失败：' + data.msg, 'error');
         }
       } catch (err) {
+        if (showProgress) {
+          hideBatchProgress();
+        }
         showToast('网络请求失败：' + (err.message || err), 'error');
       }
     }

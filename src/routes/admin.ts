@@ -310,6 +310,17 @@ app.get('/licenses', async (c) => {
     const status = c.req.query('status') || 'all';
     const sort = c.req.query('sort') || 'created_desc';
 
+    // 高级筛选参数
+    const licenseType = c.req.query('license_type') || '';
+    const userStatus = c.req.query('user_status') || '';
+    const subProduct = c.req.query('sub_product') || '';
+    const subExpiry = c.req.query('sub_expiry') || '';
+    const dateStart = c.req.query('date_start') || '';
+    const dateEnd = c.req.query('date_end') || '';
+    const deviceUsage = c.req.query('device_usage') || '';
+    const offlinePriv = c.req.query('offline_priv') || '';
+    const aiPriv = c.req.query('ai_priv') || '';
+
     const offset = (page - 1) * limit;
 
     // 1. 构建基础 WHERE 条件
@@ -319,10 +330,10 @@ app.get('/licenses', async (c) => {
     if (productId) {
       // 同时匹配主产品和订阅产品
       whereClauses.push(`(
-        l.product_id = ? 
+        l.product_id = ?
         OR EXISTS (
-          SELECT 1 FROM Subscriptions s 
-          WHERE s.license_key = l.license_key 
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
             AND s.product_id = ?
         )
       )`);
@@ -345,29 +356,142 @@ app.get('/licenses', async (c) => {
       // 临期判定：关联 Subscriptions 查找7天内过期的
       whereClauses.push(`
         EXISTS (
-          SELECT 1 FROM Subscriptions s 
-          WHERE s.license_key = l.license_key 
-            AND s.expires_at IS NOT NULL 
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+            AND s.expires_at IS NOT NULL
             AND datetime(s.expires_at) > datetime('now')
             AND datetime(s.expires_at) <= datetime('now', '+7 days')
         )
       `);
     }
 
+    // 授权标识类型筛选
+    if (licenseType === 'standard') {
+      whereClauses.push('LENGTH(l.license_key) <= 30 AND l.prebound_device_id IS NULL');
+    } else if (licenseType === 'offline') {
+      whereClauses.push('l.prebound_device_id IS NOT NULL');
+    } else if (licenseType === 'long') {
+      whereClauses.push('LENGTH(l.license_key) > 30');
+    }
+
+    // 使用者筛选
+    if (userStatus === 'named') {
+      whereClauses.push('l.user_name IS NOT NULL AND l.user_name != ""');
+    } else if (userStatus === 'unnamed') {
+      whereClauses.push('(l.user_name IS NULL OR l.user_name = "")');
+    }
+
+    // 订阅产品筛选
+    if (subProduct) {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key AND s.product_id = ?
+        )
+      `);
+      params.push(subProduct);
+    }
+
+    // 有效期筛选
+    if (subExpiry === 'permanent') {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key AND s.expires_at IS NULL
+        )
+      `);
+    } else if (subExpiry === 'valid') {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+            AND s.expires_at IS NOT NULL
+            AND datetime(s.expires_at) > datetime('now')
+        )
+      `);
+    } else if (subExpiry === 'expiring7') {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+            AND s.expires_at IS NOT NULL
+            AND datetime(s.expires_at) > datetime('now')
+            AND datetime(s.expires_at) <= datetime('now', '+7 days')
+        )
+      `);
+    } else if (subExpiry === 'expiring30') {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+            AND s.expires_at IS NOT NULL
+            AND datetime(s.expires_at) > datetime('now')
+            AND datetime(s.expires_at) <= datetime('now', '+30 days')
+        )
+      `);
+    } else if (subExpiry === 'expired') {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+            AND s.expires_at IS NOT NULL
+            AND datetime(s.expires_at) <= datetime('now')
+        )
+      `);
+    } else if (subExpiry === 'nosub') {
+      whereClauses.push(`
+        NOT EXISTS (
+          SELECT 1 FROM Subscriptions s
+          WHERE s.license_key = l.license_key
+        )
+      `);
+    }
+
+    // 创建时间筛选
+    if (dateStart) {
+      whereClauses.push('DATE(l.created_at) >= ?');
+      params.push(dateStart);
+    }
+    if (dateEnd) {
+      whereClauses.push('DATE(l.created_at) <= ?');
+      params.push(dateEnd);
+    }
+
+    // 设备占用筛选
+    if (deviceUsage === 'unused') {
+      whereClauses.push('(SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) = 0');
+    } else if (deviceUsage === 'partial') {
+      whereClauses.push(`(SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) > 0 AND (SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) < l.max_devices`);
+    } else if (deviceUsage === 'full') {
+      whereClauses.push('(SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) >= l.max_devices');
+    }
+
+    // 离线特权筛选
+    if (offlinePriv === 'has') {
+      whereClauses.push('l.offline_days_override IS NOT NULL');
+    } else if (offlinePriv === 'none') {
+      whereClauses.push('l.offline_days_override IS NULL');
+    }
+
+    // AI特权筛选
+    if (aiPriv === 'has') {
+      whereClauses.push('l.ai_daily_quota IS NOT NULL AND l.ai_daily_quota > 0');
+    } else if (aiPriv === 'none') {
+      whereClauses.push('(l.ai_daily_quota IS NULL OR l.ai_daily_quota = 0)');
+    }
+
     const whereSql = whereClauses.join(' AND ');
 
     // 2. 聚合统计看板快照 (全局，忽略当前分页但是带WHERE过滤)
-    // 但为了不改变用户预期，看板统计通常需要基于无检索状态下的全局快照。
-    // 这里我们返回一个经过筛选的 total 数，以及全局无检索状态下的四个看板数
     const statsQuery = `
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM Licenses) as global_total,
         (SELECT COUNT(*) FROM Licenses WHERE status = 'active') as global_active,
         (SELECT COUNT(*) FROM Licenses WHERE status = 'revoked') as global_revoked,
-        (SELECT COUNT(DISTINCT l.license_key) FROM Licenses l 
-         INNER JOIN Subscriptions s ON l.license_key = s.license_key 
-         WHERE s.expires_at IS NOT NULL 
-           AND datetime(s.expires_at) > datetime('now') 
+        (SELECT COUNT(DISTINCT l.license_key) FROM Licenses l
+         INNER JOIN Subscriptions s ON l.license_key = s.license_key
+         WHERE s.expires_at IS NOT NULL
+           AND datetime(s.expires_at) > datetime('now')
            AND datetime(s.expires_at) <= datetime('now', '+7 days')
         ) as global_expiring,
         (SELECT COUNT(*) FROM Licenses l WHERE ${whereSql}) as current_filter_total
@@ -384,14 +508,14 @@ app.get('/licenses', async (c) => {
 
     // 4. 拉取当前页数据
     const dataQuery = `
-      SELECT 
-        l.*, 
+      SELECT
+        l.*,
         (SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) as current_devices,
         (
           SELECT json_group_array(
             json_object('product_id', s.product_id, 'expires_at', s.expires_at)
           )
-          FROM Subscriptions s 
+          FROM Subscriptions s
           WHERE s.license_key = l.license_key
         ) as subs_json
       FROM Licenses l
