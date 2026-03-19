@@ -2171,7 +2171,7 @@ export const adminHtml = `<!DOCTYPE html>
         title: '➕ 添加订阅或续费',
         message: '正在为 <b>' + key + '</b> 配置权限。<br/><span style="color:var(--warning); font-size:12px;">注：如需清除误绑产品，请填入产品 ID 并将时长设为 0。</span>',
         inputs: [
-          { label: '产品线标识 (Product ID)', value: 'smartmp', placeholder: '如 smartmp' },
+          { label: '产品线标识 (Product ID)', type: 'productSelect', value: '', placeholder: '输入或选择产品' },
           { label: '续费时长 (天数)', value: '365', placeholder: '填 365 即加一年，填 0 清除，留空永久' }
         ],
         confirmText: '确认办理'
