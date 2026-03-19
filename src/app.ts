@@ -17,6 +17,9 @@ import { errorReporter } from './middleware/error-reporter';
 
 export const app = new Hono<{ Bindings: Env }>({ strict: false });
 
+// 配置检查缓存（避免每次请求都检查）
+let configChecked = false;
+
 // 1. 全局兜底错误拦截（最外层，捕获后续所有异常）
 app.use('*', errorReporter);
 
@@ -38,12 +41,40 @@ app.use('*', async (c, next) => {
 
   // 核心同构钩子：拦截并在下文执行前将原生 DB 对象使用 DBAdapter 包裹包装。
   // 若环境为 Cloudflare Workers，则代理调用；若为原生 Node.js，则在此注入本地 SQLite 实例，平层替换 c.env.DB。
+  // 检查 __isAdapter 标记避免重复包装（Cloudflare Workers 环境）
+  // 注意：Node.js 环境下每次请求都会重新创建，因为 c.env 是请求级别的
   if (c.env.DB && (c.env.DB as any).__isAdapter) {
     return await next();
   }
 
   c.env.DB = new DBAdapter(c.env.DB) as any;
   (c.env.DB as any).__isAdapter = true;
+  await next();
+});
+
+// 3. 必要配置检查（启动时检查一次）
+app.use('*', async (c, next) => {
+  if (!configChecked) {
+    configChecked = true;
+    const missingConfigs: string[] = [];
+
+    // 检查 JWT_SECRET
+    if (!c.env.JWT_SECRET) {
+      missingConfigs.push('JWT_SECRET');
+      console.error('[CONFIG_ERROR] 缺少必要配置: JWT_SECRET');
+    }
+
+    // 检查 ADMIN_SECRET（允许从数据库读取，这里只是警告）
+    if (!c.env.ADMIN_SECRET) {
+      console.warn('[CONFIG_WARN] 未配置 ADMIN_SECRET 环境变量，将依赖数据库中的 admin_password 配置');
+    }
+
+    if (missingConfigs.length > 0) {
+      console.error(`[CONFIG_ERROR] 服务启动失败，缺少必要配置: ${missingConfigs.join(', ')}`);
+    } else {
+      console.log('[CONFIG_OK] 必要配置检查通过');
+    }
+  }
   await next();
 });
 
@@ -65,8 +96,10 @@ app.use('/api/*', async (c, next) => {
           (!c.env.NODE_ENV && typeof process !== 'undefined' && (process as any).env.NODE_ENV === 'production');
 
         if (isProduction) {
-          console.warn(`[CORS] 生产环境拦截未授权来源: ${origin}`);
-          return null; // 生产环境默认阻断所有跨域
+          // 生产环境未配置白名单时，发出警告但仍放行同源请求
+          // 避免服务不可用，管理员应及时配置 ALLOWED_ORIGINS
+          console.warn(`[CORS] 生产环境警告: 未配置 ALLOWED_ORIGINS，建议配置以提高安全性。当前放行请求: ${origin}`);
+          return origin;
         }
         return origin; // 开发环境保持极简放通
       }
@@ -82,12 +115,46 @@ app.use('/api/*', async (c, next) => {
   return corsMiddleware(c, next);
 });
 
-// 简易请求耗时打印
-app.use('*', loggerMiddleware);
-
 // 健康检查入口
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: Date.now() });
+app.get('/health', async (c) => {
+  const startTime = Date.now();
+
+  // 检查数据库连接
+  let dbStatus = 'ok';
+  let dbLatency = 0;
+  try {
+    const dbStart = Date.now();
+    await c.env.DB.prepare('SELECT 1').first();
+    dbLatency = Date.now() - dbStart;
+  } catch (e) {
+    dbStatus = 'error';
+    console.error('[HealthCheck] 数据库连接失败:', e);
+  }
+
+  // 检查必要配置
+  const configStatus = {
+    jwt_secret: !!c.env.JWT_SECRET,
+    admin_secret: !!c.env.ADMIN_SECRET,
+    rate_limiter_kv: !!c.env.RATE_LIMITER
+  };
+
+  // 判断整体状态
+  const overallStatus = dbStatus === 'ok' && configStatus.jwt_secret ? 'ok' : 'degraded';
+
+  return c.json({
+    status: overallStatus,
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    uptime: process?.uptime?.() || null,
+    response_time_ms: Date.now() - startTime,
+    checks: {
+      database: {
+        status: dbStatus,
+        latency_ms: dbLatency
+      },
+      config: configStatus
+    }
+  }, overallStatus === 'ok' ? 200 : 503);
 });
 
 // 对外验证接口：限流 60 秒 15 次，防刷

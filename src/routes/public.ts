@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env } from '../types';
+import { Env, License, Device, Subscription } from '../types';
 import { sign } from 'hono/jwt';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -20,16 +20,16 @@ app.post('/verify', async (c) => {
     // 防御性温和截断：对非检索展示字段仅截取有效部分，兼容各种旧版客户端
     const safeDeviceName = device_name ? String(device_name).substring(0, 128) : '未命名设备';
 
-    // 1. 查询激活码是否有效（不再限制必须与请求产品的初始所属权一致，实现“一卡跑全产品”跨界）
+    // 1. 查询激活码是否有效（不再限制必须与请求产品的初始所属权一致，实现”一卡跑全产品”跨界）
     const { results: licenses } = await c.env.DB.prepare(
       `SELECT *, offline_days_override FROM Licenses WHERE license_key = ? `
-    ).bind(license_key).all();
+    ).bind(license_key).all<License>();
 
     if (licenses.length === 0) {
       return c.json({ success: false, msg: '激活码无效或未注册' }, 404);
     }
 
-    const license: any = licenses[0];
+    const license = licenses[0];
 
     if (license.status === 'revoked') {
       return c.json({ success: false, msg: '此激活码已被官方停用' }, 403);
@@ -38,10 +38,10 @@ app.post('/verify', async (c) => {
     // --- 新增：查询该激活码下的所有产品订阅 ---
     const { results: subs } = await c.env.DB.prepare(
       `SELECT product_id, expires_at FROM Subscriptions WHERE license_key = ?`
-    ).bind(license_key).all();
+    ).bind(license_key).all<Subscription>();
 
     const now = new Date();
-    const products = subs.map((sub: any) => {
+    const products = subs.map((sub) => {
       let isExpired = false;
       if (sub.expires_at) {
         isExpired = new Date(sub.expires_at) < now;
@@ -63,12 +63,11 @@ app.post('/verify', async (c) => {
       ).bind(license_key).run();
     }
 
-    // 2. 查询设备绑定情况
-    const { results: devices } = await c.env.DB.prepare(
-      `SELECT * FROM Devices WHERE license_key = ?`
-    ).bind(license_key).all();
-
-    const currentDevice = devices.find((d: any) => d.device_id === device_id);
+    // 2. 查询设备绑定情况（优化：定向查询 + 计数，避免全量扫描）
+    // 2.1 先查当前设备是否已绑定
+    const currentDevice = await c.env.DB.prepare(
+      `SELECT device_name FROM Devices WHERE license_key = ? AND device_id = ?`
+    ).bind(license_key, device_id).first<{ device_name: string }>();
 
     if (currentDevice) {
       // 已经是老设备，更新最后活跃时间
@@ -85,8 +84,14 @@ app.post('/verify', async (c) => {
         }, 403);
       }
 
+      // 2.2 新设备：查询当前设备数量（仅计数，不拉取全量数据）
+      const countResult = await c.env.DB.prepare(
+        `SELECT COUNT(*) as cnt FROM Devices WHERE license_key = ?`
+      ).bind(license_key).first<{ cnt: number }>();
+      const currentDeviceCount = countResult?.cnt || 0;
+
       // 3. 拦截：如果是新设备且达到数量上限
-      if (devices.length >= license.max_devices) {
+      if (currentDeviceCount >= license.max_devices) {
         return c.json({ success: false, msg: `激活失败。该激活码最多绑定 ${license.max_devices} 台设备。请先解绑其他设备。` }, 403);
       }
 
@@ -316,6 +321,21 @@ app.get('/portal/devices', async (c) => {
       return c.json({ success: false, msg: '找不到有效授权或已过期' }, 404);
     }
 
+    // 检查订阅是否过期（存在有效订阅即可）
+    const { results: subs } = await c.env.DB.prepare(
+      `SELECT expires_at FROM Subscriptions WHERE license_key = ? LIMIT 1`
+    ).bind(key).all();
+
+    const now = new Date();
+    const hasValidSub = subs.length === 0 || subs.some((s: any) => {
+      if (!s.expires_at) return true; // 无过期时间视为有效
+      return new Date(s.expires_at) > now;
+    });
+
+    if (!hasValidSub) {
+      return c.json({ success: false, msg: '找不到有效授权或已过期' }, 404);
+    }
+
     // 查设备
     const { results: devices } = await c.env.DB.prepare(
       `SELECT device_id, device_name, last_active FROM Devices WHERE license_key = ? ORDER BY last_active DESC`
@@ -338,7 +358,7 @@ app.get('/portal/devices', async (c) => {
       const cfg = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('max_unbind_per_month').first<{ value: string }>();
       if (cfg?.value) MAX_UNBIND_PER_MONTH = parseInt(cfg.value) || 3;
     } catch (_) { }
-    const now = new Date();
+    // 复用上面的 now 变量，避免重复创建
     const currentPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     let remainingUnbinds = MAX_UNBIND_PER_MONTH;
 

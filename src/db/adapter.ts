@@ -15,13 +15,26 @@ if (typeof globalThis !== 'undefined' && (globalThis as any).process && !(global
     });
 }
 
+// 默认数据库路径（可通过环境变量 DATABASE_PATH 覆盖）
+const DEFAULT_DB_PATH = '.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite';
+
+/**
+ * 获取数据库路径
+ * 优先级：环境变量 DATABASE_PATH > 默认路径
+ */
+function getDatabasePath(): string {
+    if (typeof process !== 'undefined' && process.env?.DATABASE_PATH) {
+        return process.env.DATABASE_PATH;
+    }
+    return DEFAULT_DB_PATH;
+}
+
 // 完全模拟 Cloudflare D1 API 签名，以对现有路由逻辑实现 0 侵入替换
 
 export interface D1Result<T = unknown> {
     results: T[];
-    success: boolean;
+    success: true;
     meta: any;
-    error?: string;
 }
 
 export interface D1PreparedStatement {
@@ -29,7 +42,7 @@ export interface D1PreparedStatement {
     first<T = unknown>(colName?: string): Promise<T | null>;
     run<T = unknown>(): Promise<D1Result<T>>;
     all<T = unknown>(): Promise<D1Result<T>>;
-    raw<T = unknown>(): Promise<T[]>;
+    raw<T = any>(options?: any): Promise<any>;
     // 以下为适配器用于 batch 内部读取提取的私有属性标识
     __sql?: string;
     __params?: any[];
@@ -50,7 +63,9 @@ export class DBAdapter {
                     console.warn('⚠️ better-sqlite3 module not loaded dynamically. Ensure you have installed it for VPS deployment.');
                     return null;
                 }
-                const db = new Database('.wrangler/state/v3/d1/miniflare-D1DatabaseObject/db.sqlite', { fileMustExist: false });
+                const dbPath = getDatabasePath();
+                console.log(`[DBAdapter] 使用数据库路径: ${dbPath}`);
+                const db = new Database(dbPath, { fileMustExist: false });
                 db.pragma('journal_mode = WAL');
                 db.pragma('synchronous = NORMAL');
                 db.pragma('cache_size = -64000');

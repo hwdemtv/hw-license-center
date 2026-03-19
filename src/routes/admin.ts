@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { Env, generateLicenseKey } from '../types';
+import { D1PreparedStatement } from '../db/adapter';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -563,8 +564,8 @@ app.post('/licenses/batch', async (c) => {
       // 5. 批量修改设备上限
       case 'set_max_devices': {
         const maxDevices = parseInt(params?.max_devices);
-        if (!maxDevices || maxDevices < 1 || maxDevices > 100) {
-          return c.json({ success: false, msg: '设备上限必须在 1-100 之间' }, 400);
+        if (!maxDevices || maxDevices < 1 || maxDevices > 500) {
+          return c.json({ success: false, msg: '设备上限必须在 1-500 之间' }, 400);
         }
         keys.forEach((key: string) => {
           statements.push(
@@ -903,16 +904,31 @@ app.put('/settings', async (c) => {
       }
       // 先从 DB 读取当前密码
       const current = await c.env.DB.prepare('SELECT value FROM SystemConfig WHERE key = ?').bind('admin_password').first<{ value: string }>();
-      const currentPwd = current?.value || c.env.ADMIN_SECRET || '';
-      if (old_password !== currentPwd) {
+      const storedPwd = current?.value || c.env.ADMIN_SECRET || '';
+
+      // 使用安全的密码验证
+      const { verifyPassword, hashPassword } = await import('../utils/crypto-helper');
+      const isValid = await verifyPassword(old_password, storedPwd);
+      if (!isValid) {
         return c.json({ success: false, msg: '旧密码验证失败' }, 403);
       }
+
+      // 哈希新密码后再存储
+      updates.admin_password = await hashPassword(String(updates.admin_password));
     }
 
     // 构建批量 UPSERT 语句
-    const stmts = Object.entries(updates).map(([key, value]) =>
-      c.env.DB.prepare('INSERT OR REPLACE INTO SystemConfig (key, value, label, category) VALUES (?, ?, (SELECT label FROM SystemConfig WHERE key = ?), (SELECT category FROM SystemConfig WHERE key = ?))').bind(key, String(value), key, key)
-    );
+    // AI 相关配置需要确保 category 为 'ai'
+    const aiKeys = ['ai_api_base', 'ai_api_key', 'ai_default_model', 'ai_default_daily_quota', 'ai_enabled'];
+    const stmts = Object.entries(updates).map(([key, value]) => {
+      const isAiKey = aiKeys.includes(key);
+      const category = isAiKey ? 'ai' : null;
+      return c.env.DB.prepare(
+        `INSERT INTO SystemConfig (key, value, label, category)
+         VALUES (?, ?, (SELECT label FROM SystemConfig WHERE key = ?), COALESCE((SELECT category FROM SystemConfig WHERE key = ?), ?))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      ).bind(key, String(value), key, key, category);
+    });
 
     if (stmts.length > 0) {
       await c.env.DB.batch(stmts);
