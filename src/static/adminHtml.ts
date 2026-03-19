@@ -1083,7 +1083,11 @@ export const adminHtml = `<!DOCTYPE html>
             </div>
             <div class="form-group">
               <label>默认产品 ID (Default ID)</label>
-              <input type="text" id="set_default_product_id" placeholder="default">
+              <div class="dropdown-container">
+                <input type="text" id="set_default_product_id" placeholder="输入或选择产品" autocomplete="off"
+                  onfocus="loadAndShowProducts('set_default_product_id', 'defaultProductDropdown')" oninput="filterProducts(this.value, 'set_default_product_id', 'defaultProductDropdown')">
+                <div id="defaultProductDropdown" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"> </div>
+              </div>
             </div>
           </div>
 
@@ -1255,6 +1259,9 @@ export const adminHtml = `<!DOCTYPE html>
             } else if (inp.type === 'productSelect') {
               // 产品下拉选择类型
               htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '输入或选择产品') + '" autocomplete="off" onfocus="loadAndShowProducts(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProducts(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
+            } else if (inp.type === 'productMultiSelect') {
+              // 产品多选下拉类型（支持逗号分隔多选）
+              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '点击选择多个产品') + '" autocomplete="off" onfocus="loadAndShowProductsMulti(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProductsMulti(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
             } else {
               htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><input type="' + (inp.type || 'text') + '" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '') + '"></div>';
             }
@@ -1534,6 +1541,79 @@ export const adminHtml = `<!DOCTYPE html>
     // 兼容旧函数名
     function setGenProduct(val) {
       setProductValue('genProductId', val, 'productDropdown');
+    }
+
+    // ========== 产品多选相关函数 ==========
+
+    // 加载并显示产品多选下拉
+    async function loadAndShowProductsMulti(inputId, dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">加载产品列表...</div>';
+      dropdown.classList.add('active');
+
+      try {
+        if (ALL_PRODUCTS_CACHE.length === 0) {
+          const res = await fetch('/api/v1/auth/admin/products', {
+            headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+          });
+          const data = await res.json();
+          if (data.success && data.products) {
+            ALL_PRODUCTS_CACHE = data.products;
+          }
+        }
+        renderProductDropdownMulti(ALL_PRODUCTS_CACHE, inputId, dropdownId);
+      } catch (e) {
+        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--error); text-align:center;">加载失败</div>';
+      }
+    }
+
+    // 过滤产品（多选模式）
+    function filterProductsMulti(searchVal, inputId, dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      const search = searchVal.toLowerCase();
+      const matches = ALL_PRODUCTS_CACHE.filter(p => p.toLowerCase().includes(search));
+      renderProductDropdownMulti(matches, inputId, dropdownId);
+    }
+
+    // 渲染产品多选下拉框
+    function renderProductDropdownMulti(products, inputId, dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      const input = document.getElementById(inputId);
+      const currentValues = input.value ? input.value.split(',').map(v => v.trim()).filter(Boolean) : [];
+
+      if (products.length === 0) {
+        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">暂无产品</div>';
+      } else {
+        let listHtml = '<div style="padding:6px 12px; font-size:11px; color:var(--text-main); background:var(--panel-bg); border-bottom:1px solid var(--border-color);">📦 点击添加/移除产品（可多选）</div>';
+        products.forEach(p => {
+          const isSelected = currentValues.includes(p);
+          const checkMark = isSelected ? '✓ ' : '';
+          const bgStyle = isSelected ? 'background:var(--accent-glow);' : '';
+          listHtml += \`<div class="dropdown-item" onclick="toggleProductMulti('\${inputId}', '\${p}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center; \${bgStyle}">
+            <span>\${checkMark}\${p}</span>
+          </div>\`;
+        });
+        dropdown.innerHTML = listHtml;
+      }
+      dropdown.classList.add('active');
+    }
+
+    // 切换产品多选（添加或移除）
+    function toggleProductMulti(inputId, product, dropdownId) {
+      const input = document.getElementById(inputId);
+      let values = input.value ? input.value.split(',').map(v => v.trim()).filter(Boolean) : [];
+
+      const idx = values.indexOf(product);
+      if (idx >= 0) {
+        // 已存在，移除
+        values.splice(idx, 1);
+      } else {
+        // 不存在，添加
+        values.push(product);
+      }
+
+      input.value = values.join(', ');
+      renderProductDropdownMulti(ALL_PRODUCTS_CACHE, inputId, dropdownId);
     }
 
     // 更新产品辅助器（包括筛选下拉和自定义生卡下拉框）
@@ -2981,7 +3061,7 @@ export const adminHtml = `<!DOCTYPE html>
         { label: '公告正文 (Content)', value: target.content, placeholder: '尽量使用纯文本' },
         { label: '跳转链接 (Action URL)', value: target.action_url || '', placeholder: '如: https://...' },
         { label: '公告类型 (update, info, warning)', value: target.type },
-        { label: '受众产品 ID (多个用英文逗号分隔，留空则全放)', value: target.target_rules || '', placeholder: '如: ZenClean,ZenImage' },
+        { label: '受众产品 ID (点击选择多个，留空则全放)', type: 'productMultiSelect', value: target.target_rules || '', placeholder: '点击选择产品' },
         { label: '是否阻断强提醒 (1=是, 0=否)', value: String(target.is_force || 0), type: 'number' }
       ];
 
