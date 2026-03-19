@@ -1252,6 +1252,9 @@ export const adminHtml = `<!DOCTYPE html>
           options.inputs.forEach((inp, i) => {
             if (inp.type === 'password') {
               htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="pwd-input-wrapper"><input type="password" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '') + '"><span class="pwd-toggle" onclick="const inp=this.previousElementSibling; inp.type=inp.type===\\'password\\'?\\'text\\':\\'password\\'; this.innerText=inp.type===\\'password\\'?\\'👁️\\':\\'🙈\\';">👁️</span></div></div>';
+            } else if (inp.type === 'productSelect') {
+              // 产品下拉选择类型
+              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '输入或选择产品') + '" autocomplete="off" onfocus="loadAndShowProducts(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProducts(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
             } else {
               htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><input type="' + (inp.type || 'text') + '" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '') + '"></div>';
             }
@@ -2639,7 +2642,7 @@ export const adminHtml = `<!DOCTYPE html>
         const res = await showModal({
           title: '续费/加产品',
           inputs: [
-            { label: '产品识别 ID (例如 smartmp)：', value: '', placeholder: '如 smartmp' },
+            { label: '产品识别 ID：', type: 'productSelect', placeholder: '输入或选择产品' },
             { label: '有效天数 (留空表示永久)：', value: '365', type: 'number' }
           ],
           confirmText: '确定'
@@ -2650,7 +2653,7 @@ export const adminHtml = `<!DOCTYPE html>
       } else if (action === 'remove_subscription') {
         const res = await showModal({
           title: '剥夺指定产品权限',
-          inputs: [{ label: '要剥夺权限的产品 ID：', value: '', placeholder: '如 smartmp' }],
+          inputs: [{ label: '要剥夺权限的产品 ID：', type: 'productSelect', placeholder: '输入或选择产品' }],
           confirmText: '确定',
           danger: true
         });
