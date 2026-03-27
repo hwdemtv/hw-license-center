@@ -3265,9 +3265,9 @@ export const adminHtml = `<!DOCTYPE html>
         }
       });
 
-      // 2. 更新管理列表上方的”筛选”下拉框
+      // 2. 更新管理列表上方的"筛选"下拉框
       const currentFilter = filterSelect.value;
-      filterSelect.innerHTML = '<option value=””>所有产品线 (Show All)</option>';
+      filterSelect.innerHTML = '<option value="">所有产品线 (Show All)</option>';
       [...PRODUCT_HISTORY].sort().forEach(p => {
         const opt = document.createElement('option');
         opt.value = p; opt.innerText = p;
@@ -3278,7 +3278,7 @@ export const adminHtml = `<!DOCTYPE html>
       // 3. 更新高级筛选区域的”订阅产品”下拉框
       if (subProductSelect) {
         const currentSubFilter = subProductSelect.value;
-        subProductSelect.innerHTML = '<option value=””>全部产品</option>';
+        subProductSelect.innerHTML = '<option value="">全部产品</option>';
         [...PRODUCT_HISTORY].sort().forEach(p => {
           const opt = document.createElement('option');
           opt.value = p; opt.innerText = p;
@@ -3292,14 +3292,14 @@ export const adminHtml = `<!DOCTYPE html>
       const matches = [...PRODUCT_HISTORY].filter(p => !searchVal || p.toLowerCase().includes(searchVal)).sort();
 
       if (matches.length === 0) {
-        dropdown.innerHTML = '<div style=”padding:12px; font-size:12px; color:var(--text-main); text-align:center;”>未找到匹配的历史记录</div>';
+        dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:var(--text-main); text-align:center;">未找到匹配的历史记录</div>';
       } else {
         let listHtml = '';
         matches.forEach(p => {
-          listHtml += \`<div class=”dropdown-item” onclick=”setGenProduct('\${p}')”>\` +
-            \`<span>\${p}</span>\` +
-            \`<div class=”remove-btn” onclick=”removeFromHistory(event, '\${p}')” title=”从历史中移除”>✕</div>\` +
-            \`</div>\`;
+          listHtml += `<div class="dropdown-item" onclick="setGenProduct('${p}')">` +
+            `<span>${p}</span>` +
+            `<div class="remove-btn" onclick="removeFromHistory(event, '${p}')" title="从历史中移除">✕</div>` +
+            `</div>`;
         });
         dropdown.innerHTML = listHtml;
       }
