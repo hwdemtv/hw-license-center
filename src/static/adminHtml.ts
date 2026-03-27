@@ -3296,10 +3296,10 @@ export const adminHtml = `<!DOCTYPE html>
       } else {
         let listHtml = '';
         matches.forEach(p => {
-          listHtml += `<div class="dropdown-item" onclick="setGenProduct('${p}')">` +
-            `<span>${p}</span>` +
-            `<div class="remove-btn" onclick="removeFromHistory(event, '${p}')" title="从历史中移除">✕</div>` +
-            `</div>`;
+          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${p}')">\` +
+            \`<span>\${p}</span>\` +
+            \`<div class="remove-btn" onclick="removeFromHistory(event, '\${p}')" title="从历史中移除">✕</div>\` +
+            \`</div>\`;
         });
         dropdown.innerHTML = listHtml;
       }
