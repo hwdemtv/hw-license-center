@@ -12,6 +12,10 @@
 - **无感切换**：业务逻辑层（Routes）只需调用标准的 `c.env.DB.prepare()` 接口，无需理会底层运行在边缘端还是本地。
 - **动态隔离**：使用字符串动态 `import()` 技巧巧妙绕过了 Cloudflare 部署时对 Node 专属模块（better-sqlite3）的静态分析报错。
 
+### 2.3 全域认证枢纽 (Zero-Plugin Auth Hub) ⭐
+- **已实装**：通过配套的 `hw-auth-client` 通用包，实现了多插件共享认证状态，极大提升了用户在 Obsidian 生态下的体验。
+- **容灾设计**：内置 3 个以上的认证端点自动轮询，确保在个别 Worker 被封禁或网络波动时依然能稳定换取令牌。
+
 ### 2.2 极致轻量化
 - **框架选择**：采用 [Hono](https://hono.dev/)。相比 Express，它更小、更快，天然适配 Web 标准，是 Cloudflare 部署的最优选。
 - **打包策略**：前端 UI（Admin/Portal）被序列化为 TypeScript 字符串导出。这种做法极大简化了 Workers 的部署复杂度（不需要 Assets 绑定），但对前端开发体验有一定牺牲。

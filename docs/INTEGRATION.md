@@ -305,9 +305,38 @@ for chunk in response:
 **优先级：** 单卡专属额度 > 全局默认额度。留空单卡配置则自动退化为全局值。
 
 
+### 5. 官方推荐工具：hw-auth-client ⭐
+为了简化上述复杂的异步认证、多域名降级以及全局存储逻辑，官方提供了 **`hw-auth-client`** 通用包。
+
+- **项目地址**：`packages/hw-auth-client`
+- **核心能力**：
+  - **多端点容灾 (Multi-Server Failover)**：支持 `CENTER_TOKEN_SERVERS` 配置，首选反代服务器，官方 Worker 作为备用，自动超时切换。
+  - **全域静默感应 (Zero-Touch Auth)**：自动读写 `.obsidian/hw-auth.json` 或系统级共享配置，实现“一人激活，全插件/全应用无感授权”。
+  - **自动化设备指纹**：内置 `node-machine-id` 等工具，确保 `device_id` 的跨平台稳定性。
+  - **离线保活策略**：内置 JWT 缓存与过期判定逻辑，断网期间仍能根据最后一次同步结果提供 Pro 特权。
+
+- **快速接入示例**：
+```typescript
+import { HwAuthClient } from "hw-auth-client";
+
+const auth = new HwAuthClient({
+    productId: "my-obsidian-plugin",
+    servers: ["https://proxy.example.com", "https://official.workers.dev"]
+});
+
+// 1. 尝试静默感应全域授权
+const isSyncActive = await auth.trySilentActivation();
+
+// 2. 发起验证 (带自动解绑逻辑)
+const result = await auth.verifyLicense(key);
+if (result.success) {
+    console.log("Pro 权限已就绪", result.products);
+}
+```
+
 ---
 
-## 六、全域精准广播通知对接方案 (v1.0)
+## 七、全域静默认证方案 (Zero-Plugin Auth Hub) ⭐
 
 本方案旨在指导 `hw-license-center` (或任何兼容的许可证服务器) 如何正确下发广播通知载荷，以便客户端能够捕获并展示运营/维护消息。
 
@@ -366,3 +395,66 @@ for chunk in response:
 *   **分片推送**：管理员可根据 `product_id` 为不同订阅用户下发不同公告。
 *   **强制性更新**：如果发布了重大版本，建议下发 `is_force: true` 的通知并指向下载页。
 *   **内容驱动**：若只是微调通知文案，不需要更改 ID，客户端也能自动感知并重新提醒。
+
+---
+
+## 七、全域静默认证方案 (Zero-Plugin Auth Hub) ⭐
+
+在 Obsidian 等多插件并存的生态中，为了避免用户在每个插件中重复输入卡密，推荐采用 **“静默级认证枢纽”** 模式。
+
+### 1. 核心设计思想
+
+该模式摒弃了“主插件控制子插件”的强耦合逻辑，转而采用**“共享配置文件 + 标准化认证逻辑”**。
+
+- **约定位置**：所有互为系列插件共同约定读取 `.obsidian/hw-auth.json` 文件。
+- **源码共用**：将认证核心代码抽离为通用的 `AuthService`。
+- **静默感知**：插件启动时，优先检测共享文件。若存在有效 Token，则直接进入激活状态，实现“一处激活，全域感知”。
+
+### 2. 共享文件结构 (`hw-auth.json`)
+
+```json
+{
+  "license_key": "YOUR-USER-KEY",
+  "token": "eyJhbGciOi...",
+  "last_verified": "2026-03-20T10:00:00.000Z",
+  "device_id": "STABLE-DEVICE-ID"
+}
+```
+
+### 3. 实现流程
+
+1.  **写操作 (任意插件首次激活)**：
+    - 用户输入卡密并点击“激活”。
+    - 插件通过 `/verify` 成功换取 JWT Token。
+    - 插件不仅更新自身的 `data.json`，同时将 `license_key`、`token` 和 `device_id` 写入 `.obsidian/hw-auth.json`。
+2.  **读操作 (其他插件冷启动)**：
+    - 插件在 `onLoad` 生命周期检测是否存在 `hw-auth.json`。
+    - 解析其中的 JWT Token，验证 `exp`（是否在保活期内）及 `device_id` 是否匹配。
+    - 若校验通过，**直接跳过手动输入界面**，自动将插件功能切换为 Pro/激活态。
+3.  **刷新与解绑同步**：
+    - 任何一个插件在执行心跳轮询或主动解绑时，同步更新或销毁该全局配置文件，确保全域状态最终一致性。
+
+### 4. 优势
+- **极致用户体验**：用户无需安装专门的“授权插件”，真正实现“零插件安装”共享模式。
+- **代码高度复用**：开发者只需维护一套 `AuthService` 逻辑。
+- **逻辑去中心化**：不依赖特定插件，任何插件都具备成为“认证入口”的能力。
+
+---
+
+## 八、ZensCreen 离线 JWT 校验实战 (零依赖与硬件指纹)
+
+在 ZensCreen (Electron 视频编辑器) 项目中，我们实现了一套完全零依赖外部 npm 库（如 `jsonwebtoken`）的纯净且高度安全的离线激活验证架构，特别适合基于 Electron 或是原生 Node.js 的桌面端应用。
+
+### 1. 核心设计亮点
+*   **零依赖 JWT 解析**：直接使用 Node.js 内置的 `crypto` 模块完成 base64url 解码与 RSA-SHA256 签名校验，极大减小了应用体积并减少了第三方库带来的潜在漏洞风险。
+*   **稳定硬件指纹 (Machine ID)**：通过 `os.networkInterfaces()` 提取网卡物理 MAC 地址等设备信息并进行 SHA-256 哈希处理，生成一台设备永久唯一的标识符，杜绝了用户间私自拷贝授权文件的行为。
+*   **纯粹的非对称加密 (RSA)**：服务端 (`hw-license-center`) 使用私钥对包含产品、硬件码和过期时间的 Payload 进行数字签名，ZensCreen 客户端仅内置了对应的 Public Key（公钥）用来“验钞”，彻底粉碎了破解者在本地绕过或篡改激活时间的途径。
+
+### 2. 实战落地工作流
+
+*   **步骤一 (获取指纹)**：用户在 ZensCreen 主界面点击激活，前端通过 IPC 跨进程调用后端的 `LicenseService.getMachineId()` 生成并展示本机唯一的机器码。
+*   **步骤二 (申请授权)**：用户将该机器码提供给系统管理员，管理员在 `hw-license-center` 后台填入指纹为其签发带有硬件约束的专属 JWT Token。
+*   **步骤三 (全离线激活)**：用户获取 Token 后贴入客户端。ZensCreen 在无需发送任何网络请求的情况下，使用内置公钥瞬间完成验签、比对内置的 `machineId` 以及生命周期 `exp`。确权无误后加密持久化到 `userData/license.hw` 文件。
+*   **步骤四 (反应式降级/解锁)**：前端借助 `zustand` 状态管理极速感知授权状态的变更。从 UI 上的 Pro 徽章点亮，到底层导出时的去水印和去时长限制操作，均自动实现了全界面的响应闭环。
+
+如果您也正在开发对安全性有一定商业化要求、且在意启动速度的桌面级重度客户端，强烈建议参考以公钥核验为主的这套零网络请求验证模式！

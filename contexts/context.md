@@ -11,6 +11,7 @@
 - **鉴权体系**: 
   - 设备端: JWT (HS256) 签名验证。
   - 管理端: Bearer Token (静态密钥) + Web 通信自适应鉴权。
+  - **官方 SDK**: `hw-auth-client` 提供多域名容灾、静默感应激活与全域配置共享能力。
 - **UI 风格**: Glassmorphism + Dark Mode 现代极简设计，原生 Vanilla JS 实现。
 
 ## 3. 关键业务逻辑

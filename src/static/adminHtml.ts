@@ -202,8 +202,8 @@ export const adminHtml = `<!DOCTYPE html>
 
     .donut-chart {
       position: relative;
-      width: 140px;
-      height: 140px;
+      width: 180px;
+      height: 180px;
     }
 
     .donut-center {
@@ -212,11 +212,17 @@ export const adminHtml = `<!DOCTYPE html>
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
+      width: 110px;
+      height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
     .donut-value {
-      font-size: 24px;
-      font-weight: 700;
+      font-size: 32px;
+      font-weight: 800;
       color: var(--text-bright);
     }
 
@@ -292,10 +298,15 @@ export const adminHtml = `<!DOCTYPE html>
     /* Forms & Inputs */
     .card {
       background: var(--panel-bg);
-      border: 1px solid var(--border-color);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 24px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.08);
     }
 
     .form-grid {
@@ -414,10 +425,84 @@ export const adminHtml = `<!DOCTYPE html>
       .lic-row {
         grid-template-columns: 1fr;
         align-items: start;
+        gap: 10px;
+        padding: 14px;
       }
 
       .lic-header {
         display: none;
+      }
+
+      /* 手机模式下每列分行显示 */
+      .lic-row > div {
+        width: 100%;
+      }
+
+      /* 卡密中间省略 - 移动端显示截断版 */
+      .lic-row .license-key-desktop {
+        display: none !important;
+      }
+      .lic-row .license-key-mobile {
+        display: inline !important;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* 设备占用列：横向紧凑排列 */
+      .lic-row > div:nth-child(4) {
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px;
+        margin-bottom: 0;
+      }
+
+      /* 操作列：紧凑图标按钮 */
+      .lic-row > div:nth-child(5) {
+        justify-content: flex-start !important;
+        padding-top: 8px;
+        border-top: 1px dashed var(--border-color);
+        margin-top: 4px;
+        gap: 8px;
+      }
+
+      /* 隐藏顶部不常用操作 */
+      .sticky-tools .search-bar > div:last-child > button:first-child,
+      .sticky-tools .search-bar > div:last-child > button:nth-child(2) {
+        display: none;
+      }
+
+      /* 收窄筛选按钮 */
+      #statusFilterGroup button {
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+      }
+
+      /* 缩小排序下拉 */
+      #sortOrder, #filterProductId {
+        max-width: 100px;
+        font-size: 11px;
+      }
+
+      /* 隐藏高级筛选按钮文字 */
+      #btnAdvancedFilter {
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+      }
+
+      /* 订阅标签更紧凑 */
+      .lic-row > div:nth-child(3) span {
+        font-size: 10px !important;
+        padding: 1px 4px !important;
+      }
+
+      /* 图标按钮更紧凑 */
+      .icon-btn {
+        padding: 4px;
+        font-size: 12px;
+      }
+    }
       }
     }
 
@@ -996,6 +1081,231 @@ export const adminHtml = `<!DOCTYPE html>
         opacity: 0;
       }
     }
+
+    /* ========== 左侧边栏布局 ========== */
+    .admin-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border-color);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 250;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-header {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-brand-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--indigo);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sidebar-brand-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+
+    /* 侧边栏垂直 tabs */
+    .sidebar .tabs {
+      flex-direction: column;
+      border-bottom: none;
+      padding: 0 8px;
+      background: transparent;
+      margin-bottom: 0;
+    }
+
+    .sidebar .tab {
+      border-bottom: none;
+      border-left: 3px solid transparent;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin-bottom: 2px;
+      text-align: left;
+    }
+
+    .sidebar .tab:hover {
+      background: rgba(88, 166, 255, 0.1);
+    }
+
+    .sidebar .tab.active {
+      background: rgba(88, 166, 255, 0.15);
+      border-left-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .sidebar-footer button {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    /* 主内容区 */
+    .main-content {
+      flex: 1;
+      margin-left: 220px;
+      min-height: 100vh;
+    }
+
+    /* 顶部工具栏 */
+    .top-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: var(--bg-color);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    /* 汉堡菜单按钮 */
+    .hamburger-btn {
+      display: none !important;
+      padding: 8px 12px;
+      font-size: 18px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-bright);
+      cursor: pointer;
+      margin-right: auto;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hamburger-btn:hover {
+      background: var(--card-bg);
+    }
+
+    /* 移动端遮罩层 */
+    .sidebar-overlay {
+      display: none !important;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 240;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .sidebar-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Dashboard 行布局 */
+    .dashboard-row-1 {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .dashboard-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* 响应式：小屏幕隐藏侧边栏 */
+    @media (max-width: 900px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .main-content {
+        margin-left: 0;
+      }
+      /* 汉堡菜单按钮 */
+      .hamburger-btn {
+        display: flex !important;
+      }
+      /* 遮罩层 */
+      .sidebar-overlay {
+        display: block !important;
+      }
+      .dashboard-row-1 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 数字等宽字体 */
+    .stat-value, .donut-value, .bar-value {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 图标按钮样式 */
+    .icon-btn {
+      padding: 6px;
+      font-size: 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:hover {
+      background: var(--card-bg);
+      transform: scale(1.1);
+    }
+
+    .icon-btn-warning:hover {
+      background: rgba(210, 153, 34, 0.15);
+      border-color: var(--warning);
+    }
+
+    .icon-btn-success:hover {
+      background: rgba(63, 185, 80, 0.15);
+      border-color: var(--success);
+    }
+
+    .icon-btn-danger:hover {
+      background: rgba(248, 81, 73, 0.15);
+      border-color: var(--danger);
+    }
   </style>
 
 <body>
@@ -1017,7 +1327,7 @@ export const adminHtml = `<!DOCTYPE html>
       <h2 style="margin-top:0; color:var(--text-bright)">🔑 身份验证 </h2>
       <p style="color:var(--text-main); font-size:14px; margin-bottom:24px;"> 输入管理员密钥以进入控制台 </p>
       <div class="form-group" style="text-align:left; position:relative;">
-        <input type="password" id="globalSecret" placeholder="输入 Admin Secret..." value="" style="padding-right: 40px;">
+        <input type="password" id="globalSecret" placeholder="输入 Admin Secret..." value="" autocomplete="off" data-1p-ignore style="padding-right: 40px;">
         <span
           onclick="const i=document.getElementById('globalSecret');if(i.type==='password'){i.type='text';this.innerText='🙈'}else{i.type='password';this.innerText='👁️'}"
           style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; opacity:0.6; user-select:none;">👁️</span>
@@ -1026,35 +1336,46 @@ export const adminHtml = `<!DOCTYPE html>
     </div>
   </div>
 
-  <div class="container">
-    <div class="sticky-header" id="stickyHeader">
-      <div class="header">
-        <div class="header-title">
-          <div style="background:var(--indigo); padding:8px; border-radius:8px; display:flex;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-          </div>
-          <h1> 互为卡密中心 </h1>
+  <!-- 左侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
         </div>
-        <div style="display:flex; gap:8px;">
-          <button class="secondary" onclick="refreshCurrentTab()">🔄 刷新 </button>
-          <button class="secondary" onclick="logout()" style="color:var(--danger); border-color:rgba(255,100,100,0.3)">🚪
-            退出登录 </button>
-        </div>
-      </div>
-
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('dashboard')">📊 数据看板 </div>
-        <div class="tab" onclick="switchTab('generate')">⚡ 极速生卡 </div>
-        <div class="tab" onclick="switchTab('offline')">🔌 离线激活 </div>
-        <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理 </div>
-        <div class="tab" onclick="switchTab('notifications')">📢 广播通知 </div>
-        <div class="tab" onclick="switchTab('settings')">⚙️ 系统设置 </div>
+        <span class="sidebar-brand-text">互为卡密中心</span>
       </div>
     </div>
+    <nav class="sidebar-nav">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('dashboard')">📊 数据看板</div>
+        <div class="tab" onclick="switchTab('generate')">⚡ 极速生卡</div>
+        <div class="tab" onclick="switchTab('offline')">🔌 离线激活</div>
+        <div class="tab" onclick="switchTab('manage')">🛠️ 资产管理</div>
+        <div class="tab" onclick="switchTab('notifications')">📢 广播通知</div>
+        <div class="tab" onclick="switchTab('settings')">⚙️ 系统设置</div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="secondary" onclick="logout()" style="color:var(--danger); border-color:rgba(255,100,100,0.3)">🚪 退出登录</button>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main-content">
+    <div class="top-toolbar">
+      <button class="hamburger-btn" onclick="toggleSidebar()" title="菜单">☰</button>
+      <button class="secondary" onclick="refreshCurrentTab()">🔄 刷新</button>
+    </div>
+
+    <!-- 移动端遮罩层 -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <div class="container">
 
     <!--Tab: Dashboard-->
     <div id="sec-dashboard" class="section active">
@@ -1105,8 +1426,8 @@ export const adminHtml = `<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- 图表区域 -->
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+      <!-- 图表区域 - 第一行：状态分布(窄) + 设备占用(宽) -->
+      <div class="dashboard-row-1">
         <!-- 状态分布图 -->
         <div class="card">
           <h3 style="margin:0 0 16px; font-size:15px;">📈 状态分布</h3>
@@ -1124,7 +1445,8 @@ export const adminHtml = `<!DOCTYPE html>
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+      <!-- 图表区域 - 第二行：产品分布 + 订阅状态 -->
+      <div class="dashboard-row-2">
         <!-- 产品分布图 -->
         <div class="card">
           <h3 style="margin:0 0 16px; font-size:15px;">📦 产品分布</h3>
@@ -1662,6 +1984,7 @@ export const adminHtml = `<!DOCTYPE html>
       </div>
     </div>
   </div>
+  </main>
 
   <!-- 批量操作悬浮条 -->
   <div class="batch-bar" id="batchBar" style="transition: none;">
@@ -1708,6 +2031,12 @@ export const adminHtml = `<!DOCTYPE html>
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    // 截断卡密显示（移动端优化）
+    function truncateKey(key) {
+      if (!key || key.length <= 14) return key;
+      return key.substring(0, 9) + '...' + key.substring(key.length - 4);
     }
 
     let ADMIN_SECRET = "";
@@ -2260,9 +2589,25 @@ export const adminHtml = `<!DOCTYPE html>
       if (tab === 'notifications') loadNotifications();
       // 在标签切换时同步更新底栏可见性，防全局遮挡
       if (typeof updateBatchBar === 'function') updateBatchBar();
-
+      // 移动端切换 tab 后自动关闭侧边栏
+      closeSidebar();
       // 切换标签后，高度可能因不同面板的内容而变化，触发同步
       setTimeout(syncStickyHeights, 50);
+    }
+
+    // 移动端侧边栏切换
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (sidebar) sidebar.classList.toggle('open');
+      if (overlay) overlay.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (sidebar) sidebar.classList.remove('open');
+      if (overlay) overlay.classList.remove('active');
     }
 
     function refreshCurrentTab() {
@@ -2359,7 +2704,7 @@ export const adminHtml = `<!DOCTYPE html>
       container.innerHTML = \`
         <div class="chart-container">
           <div class="donut-chart" style="border-radius:50%; background: conic-gradient(\${gradientStr});">
-            <div class="donut-center" style="width:80px; height:80px; background:var(--card-bg); border-radius:50%;">
+            <div class="donut-center" style="background:var(--panel-bg); border-radius:50%;">
               <div class="donut-value">\${total}</div>
               <div class="donut-label">总卡密</div>
             </div>
@@ -2441,28 +2786,31 @@ export const adminHtml = `<!DOCTYPE html>
         const usagePct = totalQuota > 0 ? Math.round(totalDevices / totalQuota * 100) : 0;
 
         return \`
-          <div style="margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-              <span style="color:var(--text-main);">总设备配额</span>
-              <span style="font-weight:600;">\${totalDevices} / \${totalQuota} 台</span>
+          <div style="margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+              <span style="color:var(--text-main); font-size:13px;">总设备配额</span>
+              <span style="font-weight:700; font-size:14px;">\${totalDevices} / \${totalQuota} 台</span>
             </div>
-            <div style="height:8px; background:var(--border-color); border-radius:4px; overflow:hidden;">
-              <div style="width:\${usagePct}%; height:100%; background:var(--accent);"></div>
+            <div style="height:12px; background:var(--border-color); border-radius:6px; overflow:hidden;">
+              <div style="width:\${usagePct}%; height:100%; background:linear-gradient(90deg, var(--indigo) 0%, var(--accent) 100%); border-radius:6px;"></div>
             </div>
-            <div style="text-align:right; font-size:11px; color:var(--text-main); margin-top:4px;">使用率 \${usagePct}%</div>
+            <div style="text-align:right; font-size:12px; color:var(--text-main); margin-top:6px;">使用率 \${usagePct}%</div>
           </div>
-          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:20px; font-weight:700; color:var(--text-bright);">\${unused}</div>
-              <div style="font-size:11px; color:var(--text-main);">未使用</div>
+          <div style="display:flex; justify-content:space-around; align-items:center; padding:12px 0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:10px; height:10px; border-radius:50%; background:var(--text-main);"></div>
+              <span style="font-size:13px; color:var(--text-main);">未使用</span>
+              <span style="font-size:18px; font-weight:700; color:var(--text-bright);">\${unused}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:20px; font-weight:700; color:var(--warning);">\${partial}</div>
-              <div style="font-size:11px; color:var(--text-main);">使用中</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:10px; height:10px; border-radius:50%; background:var(--warning);"></div>
+              <span style="font-size:13px; color:var(--text-main);">使用中</span>
+              <span style="font-size:18px; font-weight:700; color:var(--warning);">\${partial}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:20px; font-weight:700; color:var(--danger);">\${full}</div>
-              <div style="font-size:11px; color:var(--text-main);">已满</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:10px; height:10px; border-radius:50%; background:var(--danger);"></div>
+              <span style="font-size:13px; color:var(--text-main);">已满</span>
+              <span style="font-size:18px; font-weight:700; color:var(--danger);">\${full}</span>
             </div>
           </div>
         \`;
@@ -2497,17 +2845,27 @@ export const adminHtml = `<!DOCTYPE html>
 
         if (sorted.length === 0) return '<div style="color:var(--text-main); text-align:center; padding:20px;">暂无数据</div>';
 
+        // 渐变色数组
+        const gradients = [
+          'linear-gradient(90deg, var(--indigo) 0%, var(--accent) 100%)',
+          'linear-gradient(90deg, #3fb950 0%, #56d4dd 100%)',
+          'linear-gradient(90deg, #f778ba 0%, #d29922 100%)',
+          'linear-gradient(90deg, #79c0ff 0%, #a371f7 100%)',
+          'linear-gradient(90deg, #f85149 0%, #d29922 100%)'
+        ];
+
         let html = '';
-        sorted.forEach(([pid, count]) => {
+        sorted.forEach(([pid, count], idx) => {
           const pct = Math.round(count / total * 100);
+          const gradient = gradients[idx % gradients.length];
           html += \`
-            <div style="margin-bottom:12px;">
-              <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-                <span style="color:var(--text-bright);">\${pid}</span>
+            <div style="margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+                <span style="color:var(--text-bright); font-weight:500;">\${pid}</span>
                 <span style="color:var(--text-main);">\${count} 个 (\${pct}%)</span>
               </div>
-              <div style="height:6px; background:var(--border-color); border-radius:3px; overflow:hidden;">
-                <div style="width:\${pct}%; height:100%; background:var(--accent);"></div>
+              <div style="height:8px; background:var(--border-color); border-radius:4px; overflow:hidden;">
+                <div style="width:\${pct}%; height:100%; background:\${gradient}; border-radius:4px;"></div>
               </div>
             </div>
           \`;
@@ -2558,31 +2916,55 @@ export const adminHtml = `<!DOCTYPE html>
           if (hasExpired) expired++;
         });
 
+        const total = data.data.length || 1;
+        const permanentPct = Math.round(permanent / total * 100);
+        const validPct = Math.round(valid / total * 100);
+        const expiring7Pct = Math.round(expiring7 / total * 100);
+        const expiring30Pct = Math.round(expiring30 / total * 100);
+        const expiredPct = Math.round(expired / total * 100);
+        const nosubPct = Math.round(nosub / total * 100);
+
         return \`
-          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:var(--success);">\${permanent}</div>
-              <div style="font-size:10px; color:var(--text-main);">永久</div>
+          <!-- 水平堆叠柱状图 -->
+          <div style="height:24px; display:flex; border-radius:6px; overflow:hidden; margin-bottom:20px;">
+            <div style="width:\${permanentPct}%; background:var(--success);" title="永久 \${permanent}"></div>
+            <div style="width:\${validPct}%; background:var(--accent);" title="有效 \${valid}"></div>
+            <div style="width:\${expiring7Pct}%; background:var(--warning);" title="7天内到期 \${expiring7}"></div>
+            <div style="width:\${expiring30Pct}%; background:#d29922;" title="30天内到期 \${expiring30}"></div>
+            <div style="width:\${expiredPct}%; background:var(--danger);" title="已过期 \${expired}"></div>
+            <div style="width:\${nosubPct}%; background:var(--text-main);" title="无订阅 \${nosub}"></div>
+          </div>
+          <!-- 两列简洁列表 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 20px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:var(--success);"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">永久</span>
+              <span style="font-size:14px; font-weight:700; color:var(--success);">\${permanent}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:var(--accent);">\${valid}</div>
-              <div style="font-size:10px; color:var(--text-main);">有效</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:var(--warning);"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">7天内到期</span>
+              <span style="font-size:14px; font-weight:700; color:var(--warning);">\${expiring7}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:var(--text-bright);">\${nosub}</div>
-              <div style="font-size:10px; color:var(--text-main);">无订阅</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:var(--accent);"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">有效</span>
+              <span style="font-size:14px; font-weight:700; color:var(--accent);">\${valid}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:var(--warning);">\${expiring7}</div>
-              <div style="font-size:10px; color:var(--text-main);">7天内到期</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:#d29922;"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">30天内到期</span>
+              <span style="font-size:14px; font-weight:700; color:#d29922;">\${expiring30}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:#d29922;">\${expiring30}</div>
-              <div style="font-size:10px; color:var(--text-main);">30天内到期</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:var(--danger);"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">已过期</span>
+              <span style="font-size:14px; font-weight:700; color:var(--danger);">\${expired}</span>
             </div>
-            <div style="padding:8px; background:var(--card-bg); border-radius:6px;">
-              <div style="font-size:18px; font-weight:700; color:var(--danger);">\${expired}</div>
-              <div style="font-size:10px; color:var(--text-main);">已过期</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:2px; background:var(--text-main);"></div>
+              <span style="font-size:12px; color:var(--text-main); flex:1;">无订阅</span>
+              <span style="font-size:14px; font-weight:700; color:var(--text-bright);">\${nosub}</span>
             </div>
           </div>
         \`;
@@ -2629,13 +3011,15 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     function syncStickyHeights() {
-      const header = document.getElementById('stickyHeader');
+      const toolbar = document.querySelector('.top-toolbar');
       const tools = document.querySelector('.sticky-tools');
       const root = document.documentElement;
-      if (header) {
-        root.style.setProperty('--header-h', header.offsetHeight + 'px');
+      // 顶部工具栏高度
+      if (toolbar) {
+        root.style.setProperty('--header-h', toolbar.offsetHeight + 'px');
       }
-      if (tools && tools.offsetParent !== null) { // 仅当工具栏可见时更新其高度变量
+      // 筛选工具栏高度
+      if (tools && tools.offsetParent !== null) {
         root.style.setProperty('--tools-h', tools.offsetHeight + 'px');
       }
     }
@@ -3069,13 +3453,23 @@ export const adminHtml = `<!DOCTYPE html>
 
           visibleSubs.forEach((s) => {
             let text = '永 久';
-            let cls = 'badge-success';
+            let textColor = 'var(--success)';
+            let bgColor = 'rgba(63, 185, 80, 0.1)';
             if (s.expires_at) {
               const days = Math.ceil((new Date(s.expires_at) - now) / (86400000));
               text = days > 0 ? '剩 ' + days + ' 天' : '已过期';
-              cls = days > 7 ? 'badge-success' : (days > 0 ? 'badge-warning' : 'badge-danger');
+              if (days > 7) {
+                textColor = 'var(--success)';
+                bgColor = 'rgba(63, 185, 80, 0.1)';
+              } else if (days > 0) {
+                textColor = 'var(--warning)';
+                bgColor = 'rgba(210, 153, 34, 0.1)';
+              } else {
+                textColor = 'var(--danger)';
+                bgColor = 'rgba(248, 81, 73, 0.1)';
+              }
             }
-            subHtml += '<span class="badge ' + cls + '" style="margin-right:4px;">' + s.product_id + ': ' + text + '</span>';
+            subHtml += '<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-size:11px; background:' + bgColor + '; color:' + textColor + '; border-radius:4px; margin-right:4px;"><span style="color:var(--text-main);">' + s.product_id + ':</span> ' + text + '</span>';
           });
 
           // 折叠显示更多订阅
@@ -3113,7 +3507,8 @@ export const adminHtml = `<!DOCTYPE html>
               <span class="badge \${isRevoked ? 'badge-danger' : 'badge-success'}" style="transform: scale(0.85); transform-origin:left; margin-left:2px;">\${lic.status.toUpperCase()}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-family:monospace; font-size:12px; color:var(--accent);">\${lic.license_key}</span>
+              <span class="license-key-desktop" style="font-family:monospace; font-size:12px; color:var(--text-main);">\${lic.license_key}</span>
+              <span class="license-key-mobile" style="font-family:monospace; font-size:12px; color:var(--text-main); display:none;">\${truncateKey(lic.license_key)}</span>
               <span style="cursor:pointer; opacity:0.6; font-size:12px;" onclick="copyText('\${lic.license_key}')" title="复制卡密">📋</span>
             </div>
           </div>
@@ -3146,11 +3541,11 @@ export const adminHtml = `<!DOCTYPE html>
         </div>
 
         <!-- Col 4: 操作 -->
-        <div style="display:flex; gap:8px; justify-content:flex-end;">
-          <button class="secondary" style="padding:4px 8px; font-size:12px;" onclick="toggleStatus('\${lic.license_key}', '\${isRevoked ? 'active' : 'revoked'}')">
-            \${isRevoked ? '🔓 恢复' : '🔒 吊销'}
+        <div style="display:flex; gap:6px; justify-content:flex-end;">
+          <button class="icon-btn \${isRevoked ? 'icon-btn-success' : 'icon-btn-warning'}" onclick="toggleStatus('\${lic.license_key}', '\${isRevoked ? 'active' : 'revoked'}')" title="\${isRevoked ? '恢复' : '吊销'}">
+            \${isRevoked ? '🔓' : '🔒'}
           </button>
-          <button class="danger" style="padding:4px 8px; font-size:12px;" onclick="deleteLic('\${lic.license_key}')" title="彻底删除">🗑️</button>
+          <button class="icon-btn icon-btn-danger" onclick="deleteLic('\${lic.license_key}')" title="彻底删除">🗑️</button>
         </div>
       </div>
       <!-- 动态设备面板插槽 -->
@@ -4550,16 +4945,6 @@ export const adminHtml = `<!DOCTYPE html>
       }
     }
 
-
-    // 滚动监听：处理顶部粘性样式的视觉增强
-    window.addEventListener('scroll', () => {
-      const header = document.getElementById('stickyHeader');
-      if (window.scrollY > 20) {
-        header.classList.add('scrolled');
-      } else {
-        header.classList.remove('scrolled');
-      }
-    });
 
     // 初始化高度校准
     window.addEventListener('resize', syncStickyHeights);

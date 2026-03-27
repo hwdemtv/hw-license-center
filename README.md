@@ -57,6 +57,7 @@
 | **安全** | [🔐 安全策略与审计报告](./docs/SECURITY.md) | 包含 XSS、CORS 与限流器的加固详情 |
 | **回顾** | [📅 研发里程碑回顾](./docs/DEVELOPMENT_RETROSPECTIVE.md) | Phase 1-27 详尽研发历程总结 |
 | **展望** | [🛤️ 路线图与潜在风险](./docs/ROADMAP_AND_RISKS.md) | 技术债分析与中长期优化方向 |
+| **SDK**  | **[📦 hw-auth-client](file:///../../packages/hw-auth-client)** | **官方推荐的 TypeScript SDK，支持多域名容灾与静默授权** |
 
 ---
 
