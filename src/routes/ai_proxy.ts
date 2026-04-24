@@ -145,14 +145,28 @@ app.post('/chat/completions', async (c) => {
     const targetUrl = `${activeApiBase.replace(/\/+$/, '')}/chat/completions`;
 
     try {
-        const upstreamRes = await fetch(targetUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${activeApiKey}`,
-            },
-            body: JSON.stringify(reqBody),
-        });
+        const clientUserAgent = c.req.header('User-Agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+        // 为上游请求添加显式超时（55s），防止 Worker 被平台强制中断
+        const controller = new AbortController();
+        const upstreamTimeoutId = setTimeout(() => controller.abort(), 55000);
+
+        let upstreamRes: Response;
+        try {
+            upstreamRes = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeApiKey}`,
+                    'User-Agent': clientUserAgent,
+                    'X-Forwarded-For': c.req.header('CF-Connecting-IP') || '',
+                },
+                body: JSON.stringify(reqBody),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(upstreamTimeoutId);
+        }
 
         // 如果上游返回失败，直接透传错误（不扣额度）
         if (!upstreamRes.ok) {
