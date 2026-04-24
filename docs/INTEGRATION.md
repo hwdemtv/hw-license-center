@@ -11,9 +11,18 @@
 ## 二、基础接入流程 (API 校验)
 
 ### 1. 明确你的「产品 ID」
-不需要在数据库预先注册，前端生成卡密时可以直接填入，例如：
+不需要在数据库预先注册，前端生成卡密时可以直接填入。
+> [!TIP]
+> **Python/桌面端案例**：参考 [TiebaMecha 接入指南 (CLIENT_CASE_TIEBAMECHA.md)](./CLIENT_CASE_TIEBAMECHA.md) 了解 HWID 提取与多节点容灾逻辑。
+
 * `my-desktop-app`
+* `hw-flowpost`
 * `obsidian-plugin-pro`
+
+> [!IMPORTANT]
+> **命名规范与大小写敏感**：
+> 1. **强制小写**：强烈建议所有产品 ID 统一使用全小写（如 `hw-flowpost`），以避免在不同系统间传输时产生歧义。
+> 2. **精确匹配**：服务端（如广播推送、订阅检索）对该字段是**大小写敏感**的。如果客户端发送 `HW-FlowPost` 而后端数据库登记的是 `hw-flowpost`，将导致广播通知无法下发。
 
 ### 2. 客户端构造 `/verify` 请求
 
@@ -83,7 +92,31 @@ async function verifyLicense(key: string, deviceId: string) {
 
 ---
 
-## 三、高级安全防篡改 (Offline Jwt 效验)
+## 三、关键网络与业务逻辑说明 (Troubleshooting)
+
+在对接过程中，请务必关注以下两个技术细节，以确保验证流程的鲁棒性。
+
+### 1. Cloudflare 边缘防护 (Bot Protection)
+本系统推荐部署在 Cloudflare Workers 上。Cloudflare 的安全性策略（如 WAF / Bot Fight Mode）会默认拦截大多数非浏览器环境的自动化请求（返回 HTTP 403 或 Error 1010）。
+- **现象**：Python、Go 或原生 cURL 命令行请求被拒绝，但浏览器能正常打开。
+- **对策**：客户端发起请求时**必须设置浏览器风格的 `User-Agent`**（如 `Mozilla/5.0...`）。
+
+### 2. HTTP 状态码的业务语义
+为了符合 RESTful 规范，本系统将特定的业务逻辑失败映射到了 HTTP 状态码等级：
+
+| 状态码 | 业务含义 | 客户端建议处理方式 |
+| :--- | :--- | :--- |
+| **200** | 验证通过 / 内部已知错误 | 解析 JSON 中的 `success` 字段 |
+| **403** | 授权拒绝 (如：设备超限) | 解析 JSON 并向用户展示 `msg` 详细原因 |
+| **404** | 激活码无效 | 提示“激活码无效”，**不要误判为接口不存在** |
+| **500+** | 服务器真正故障 | 提示“服务维护中”，触发离线保活逻辑 |
+
+> [!IMPORTANT]
+> **不要仅通过状态码 == 200 判断授权成功**。客户端应当解析所有符合 `application/json` 类型的响应 Body，并优先显示服务端下发的 `msg` 文字提示。
+
+---
+
+## 四、高级安全防篡改 (Offline Jwt 效验)
 
 为了防止破解者通过修改本地 HOSTS 或抓包篡改 HTTP 请求（将 `{"success": false}` 改成 `{"success": true}`），**强烈建议在本地执行轻量级的 JWT (JSON Web Token) 校验**。
 

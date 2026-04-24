@@ -35,6 +35,21 @@ app.post('/verify', async (c) => {
       return c.json({ success: false, msg: '此激活码已被官方停用' }, 403);
     }
 
+    if (license.status === 'inactive') {
+      // 首次激活，更新状态
+      await c.env.DB.prepare(
+        `UPDATE Licenses SET status = 'active', activated_at = CURRENT_TIMESTAMP WHERE license_key = ?`
+      ).bind(license_key).run();
+
+      // 新增计算：若存在未结转的相对天数，从此激活时刻起算转换为到期时间
+      await c.env.DB.prepare(
+        `UPDATE Subscriptions 
+         SET expires_at = strftime('%Y-%m-%dT%H:%M:%S.000Z', datetime('now', '+' || duration_days || ' days')),
+             duration_days = NULL 
+         WHERE license_key = ? AND expires_at IS NULL AND duration_days IS NOT NULL`
+      ).bind(license_key).run();
+    }
+
     // --- 新增：离线激活码预绑定设备验证 ---
     if (license.prebound_device_id) {
       // 该激活码是离线激活码，必须匹配预绑定的设备ID
@@ -67,13 +82,6 @@ app.post('/verify', async (c) => {
 
     // 如果没有任何有效订阅（虽然罕见），或者当前请求的特定 product_id 已明确过期，
     // 能在这做强拦截。但为保持通用性，我们统一返回所有 products，由插件判定具体权限。
-
-    if (license.status === 'inactive') {
-      // 首次激活，更新状态
-      await c.env.DB.prepare(
-        `UPDATE Licenses SET status = 'active', activated_at = CURRENT_TIMESTAMP WHERE license_key = ?`
-      ).bind(license_key).run();
-    }
 
     // 2. 查询设备绑定情况（优化：定向查询 + 计数，避免全量扫描）
     // 2.1 先查当前设备是否已绑定

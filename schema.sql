@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS Subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     license_key TEXT NOT NULL,
     product_id TEXT NOT NULL,                   -- 订阅的产品标识，如 'smartmp', 'token-server'
-    expires_at TEXT DEFAULT NULL,               -- 到期时间戳(ISO)。NULL 表示永久有效（买断制）
+    expires_at TEXT DEFAULT NULL,               -- 到期时间戳(ISO)。NULL 表示永久有效（买断制），或当存在 duration_days 时表示从激活起算的预计时间
+    duration_days INTEGER DEFAULT NULL,         -- 尚未激活时的预期持续天数
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(license_key) REFERENCES Licenses(license_key) ON DELETE CASCADE,
     UNIQUE(license_key, product_id)

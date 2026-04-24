@@ -1954,6 +1954,12 @@ export const adminHtml = `<!DOCTYPE html>
               </select>
               <p class="help-text">关闭后所有通过网关的 AI 请求将被拒绝。</p>
             </div>
+            <div class="form-group" style="margin-top:16px; display:flex; align-items:center; gap:12px;">
+              <button type="button" id="btn_test_ai_connection" class="secondary" onclick="testAiConnection()" style="padding:8px 16px; font-size:13px;">
+                🔗 测试连通性
+              </button>
+              <span id="ai_test_result" style="font-size:13px; color:#8b949e;"></span>
+            </div>
           </div>
 
           <!-- 门户页面定制 -->
@@ -2667,16 +2673,18 @@ export const adminHtml = `<!DOCTYPE html>
 
       const active = stats.active || 0;
       const revoked = stats.revoked || 0;
+      const inactive = stats.inactive || 0;
       const expiring = stats.expiring || 0;
 
       // 计算百分比
       const activePct = Math.round(active / total * 100);
       const revokedPct = Math.round(revoked / total * 100);
       const expiringPct = Math.round(expiring / total * 100);
+      const inactivePct = Math.round(inactive / total * 100);
 
       // conic-gradient 颜色和角度
-      // active=绿色, expiring=橙色, revoked=红色, 其他=灰色
-      const others = total - active - revoked - expiring;
+      // active=绿色, expiring=橙色, revoked=红色, inactive=紫色, 其他=灰色
+      const others = total - active - revoked - expiring - inactive;
       const othersPct = others > 0 ? Math.round(others / total * 100) : 0;
 
       // 构建渐变
@@ -3223,6 +3231,9 @@ export const adminHtml = `<!DOCTYPE html>
             <span>\${checkMark}\${p}</span>
           </div>\`;
         });
+        listHtml += \`<div style="padding:8px; border-top:1px solid var(--border-color); position:sticky; bottom:0; background:var(--panel-bg); z-index:10;">
+          <button class="primary" style="width:100%; padding:6px; font-size:12px;" onclick="document.getElementById('\${dropdownId}').classList.remove('active')">完成选择 (Done)</button>
+        </div>\`;
         dropdown.innerHTML = listHtml;
       }
       dropdown.classList.add('active');
@@ -3308,7 +3319,7 @@ export const adminHtml = `<!DOCTYPE html>
     // 点击外部自动关闭下拉
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.dropdown-container')) {
-        document.getElementById('productDropdown').classList.remove('active');
+        document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('active'));
       }
     });
 
@@ -3468,6 +3479,10 @@ export const adminHtml = `<!DOCTYPE html>
                 textColor = 'var(--danger)';
                 bgColor = 'rgba(248, 81, 73, 0.1)';
               }
+            } else if (s.duration_days) {
+              text = '待激活 (' + s.duration_days + '天)';
+              textColor = '#a371f7';
+              bgColor = 'rgba(163, 113, 247, 0.1)';
             }
             subHtml += '<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-size:11px; background:' + bgColor + '; color:' + textColor + '; border-radius:4px; margin-right:4px;"><span style="color:var(--text-main);">' + s.product_id + ':</span> ' + text + '</span>';
           });
@@ -4691,6 +4706,57 @@ export const adminHtml = `<!DOCTYPE html>
       }
     }
 
+    // 测试 AI 代理网关连通性
+    async function testAiConnection() {
+      const apiBase = document.getElementById('set_ai_api_base')?.value?.trim();
+      const apiKey = document.getElementById('set_ai_api_key')?.value?.trim();
+      const model = document.getElementById('set_ai_default_model')?.value?.trim() || 'glm-4-flash';
+
+      const resultEl = document.getElementById('ai_test_result');
+      const btn = document.getElementById('btn_test_ai_connection');
+
+      if (!apiBase) {
+        resultEl.textContent = '⚠️ 请先填写 AI 服务 Base URL';
+        resultEl.style.color = '#f0883e';
+        return;
+      }
+      if (!apiKey) {
+        resultEl.textContent = '⚠️ 请先填写 API Key';
+        resultEl.style.color = '#f0883e';
+        return;
+      }
+
+      // 显示测试中状态
+      resultEl.textContent = '⏳ 正在测试连接...';
+      resultEl.style.color = '#8b949e';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      try {
+        const res = await fetch('/api/v1/auth/admin/ai-proxy/test', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_base: apiBase, api_key: apiKey, model: model })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          const { latency_ms, provider } = data.details || {};
+          resultEl.innerHTML = `✅ <span style="color:#3fb950">连接成功</span> | ${provider || 'Unknown'} | 延迟 ${latency_ms}ms`;
+          resultEl.style.color = '#3fb950';
+        } else {
+          resultEl.innerHTML = `❌ <span style="color:#f85149">${data.msg || '连接失败'}</span>`;
+          resultEl.style.color = '#f85149';
+        }
+      } catch (e) {
+        resultEl.textContent = '❌ 网络错误: ' + e.message;
+        resultEl.style.color = '#f85149';
+      } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    }
+
     async function saveSettings() {
       const keys = ['jwt_offline_days', 'max_unbind_per_month', 'default_max_devices', 'expiry_warning_days', 'default_product_id', 'portal_title', 'portal_subtitle', 'portal_tips', 'admin_contact', 'webhook_secret', 'ai_api_base', 'ai_api_key', 'ai_default_model', 'ai_default_daily_quota', 'ai_enabled'];
       const updates = {};
@@ -4762,8 +4828,8 @@ export const adminHtml = `<!DOCTYPE html>
       const container = document.getElementById('notificationListContainer');
       container.innerHTML = '<div style="text-align:center; padding:50px; color:var(--text-main)">🚀 正在拉取通知数据...</div>';
       try {
-        const res = await fetch('/api/v1/auth/admin/notifications', {
-          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+        const res = await fetch('/api/v1/auth/admin/notifications?_t=' + Date.now(), {
+          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET, 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
         const data = await res.json();
         if (data.success) {

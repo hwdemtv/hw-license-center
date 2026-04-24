@@ -13,12 +13,10 @@ app.post('/generate', async (c) => {
     const generatedKeys: string[] = [];
     const statements: D1PreparedStatement[] = [];
 
-    // 计算到期时间（如果有传入 duration_days）
-    let expiresAt: string | null = null;
+    // 仅记录购买的有效天数，真实到期时间在首次验证时换算
+    let durationDays: number | null = null;
     if (duration_days && typeof duration_days === 'number' && duration_days > 0) {
-      const date = new Date();
-      date.setDate(date.getDate() + duration_days);
-      expiresAt = date.toISOString();
+      durationDays = duration_days;
     }
 
     // 批量生成卡密并构建语句
@@ -29,15 +27,15 @@ app.post('/generate', async (c) => {
       // 1. 插入 Licenses 表
       statements.push(
         c.env.DB.prepare(
-          `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'active', ?)`
+          `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'inactive', ?)`
         ).bind(newKey, product_id, user_name, max_devices)
       );
 
-      // 2. 插入对应的 Subscriptions 记录
+      // 2. 插入对应的 Subscriptions 记录（记录期限而非固定时间点）
       statements.push(
         c.env.DB.prepare(
-          `INSERT INTO Subscriptions(license_key, product_id, expires_at) VALUES(?, ?, ?)`
-        ).bind(newKey, product_id, expiresAt)
+          `INSERT INTO Subscriptions(license_key, product_id, expires_at, duration_days) VALUES(?, ?, NULL, ?)`
+        ).bind(newKey, product_id, durationDays)
       );
     }
 
@@ -488,6 +486,7 @@ app.get('/licenses', async (c) => {
         (SELECT COUNT(*) FROM Licenses) as global_total,
         (SELECT COUNT(*) FROM Licenses WHERE status = 'active') as global_active,
         (SELECT COUNT(*) FROM Licenses WHERE status = 'revoked') as global_revoked,
+        (SELECT COUNT(*) FROM Licenses WHERE status = 'inactive') as global_inactive,
         (SELECT COUNT(DISTINCT l.license_key) FROM Licenses l
          INNER JOIN Subscriptions s ON l.license_key = s.license_key
          WHERE s.expires_at IS NOT NULL
@@ -513,7 +512,7 @@ app.get('/licenses', async (c) => {
         (SELECT COUNT(*) FROM Devices d WHERE d.license_key = l.license_key) as current_devices,
         (
           SELECT json_group_array(
-            json_object('product_id', s.product_id, 'expires_at', s.expires_at)
+            json_object('product_id', s.product_id, 'expires_at', s.expires_at, 'duration_days', s.duration_days)
           )
           FROM Subscriptions s
           WHERE s.license_key = l.license_key
@@ -545,6 +544,7 @@ app.get('/licenses', async (c) => {
         total: statsResult?.global_total || 0,
         active: statsResult?.global_active || 0,
         revoked: statsResult?.global_revoked || 0,
+        inactive: statsResult?.global_inactive || 0,
         expiring: statsResult?.global_expiring || 0
       }
     });
@@ -1276,5 +1276,117 @@ app.put('/settings', async (c) => {
     return c.json({ success: false, msg: '更新配置失败: ' + e.message }, 500);
   }
 });
+
+// ===================== AI 代理网关连通性测试 =====================
+
+// 测试 AI 代理网关连通性
+app.post('/ai-proxy/test', async (c) => {
+  try {
+    const { api_base, api_key, model } = await c.req.json();
+
+    if (!api_base || !api_key) {
+      return c.json({ success: false, msg: '缺少必要的配置参数 (API Base URL 或 API Key)' }, 400);
+    }
+
+    // 清理 Base URL
+    const baseUrl = api_base.replace(/\/+$/, '');
+    const targetModel = model || 'glm-4-flash';
+
+    // 构造测试请求：发送一个极简的 chat completions 请求
+    const testPayload = {
+      model: targetModel,
+      messages: [
+        { role: 'user', content: 'Hi' }
+      ],
+      max_tokens: 5
+    };
+
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${api_key}`
+        },
+        body: JSON.stringify(testPayload)
+      });
+
+      const latency = Date.now() - startTime;
+
+      if (response.ok) {
+        let data: any;
+        try {
+          data = await response.json();
+        } catch (_) {
+          data = null;
+        }
+        return c.json({
+          success: true,
+          msg: '连接成功',
+          details: {
+            status: response.status,
+            latency_ms: latency,
+            response_model: data?.model || targetModel,
+            provider: detectProvider(baseUrl)
+          }
+        });
+      } else {
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+          const errBody = await response.text();
+          if (errBody) {
+            const parsed = JSON.parse(errBody);
+            errorMsg = parsed.error?.message || parsed.error?.code || errorMsg;
+          }
+        } catch (_) {}
+
+        return c.json({
+          success: false,
+          msg: `连接失败: ${errorMsg}`,
+          details: {
+            status: response.status,
+            latency_ms: latency
+          }
+        }, response.status >= 500 ? 502 : 400);
+      }
+    } catch (fetchError: any) {
+      return c.json({
+        success: false,
+        msg: `网络错误: ${fetchError.message}`,
+        details: {
+          error_type: fetchError.cause?.name || 'FetchError',
+          latency_ms: Date.now() - startTime
+        }
+      }, 502);
+    }
+  } catch (e: any) {
+    console.error('AI 连通性测试失败:', e);
+    return c.json({ success: false, msg: '测试请求失败: ' + e.message }, 500);
+  }
+});
+
+// 根据 URL 识别 AI 服务提供商
+function detectProvider(baseUrl: string): string {
+  const url = baseUrl.toLowerCase();
+  if (url.includes('openai.com') || url.includes('api.openai')) return 'OpenAI';
+  if (url.includes('anthropic.com')) return 'Anthropic';
+  if (url.includes('googleapis.com')) return 'Google AI';
+  if (url.includes('zhipuai') || url.includes('zhipu')) return '智谱 AI';
+  if (url.includes('dashscope')) return '阿里云 DashScope';
+  if (url.includes('qwen')) return '阿里云 Qwen';
+  if (url.includes('deepseek')) return 'DeepSeek';
+  if (url.includes('moonshot') || url.includes('moonshot')) return '月之暗面 Kimi';
+  if (url.includes('minimax')) return 'MiniMax';
+  if (url.includes('tencent') || url.includes('hunyuan')) return '腾讯混元';
+  if (url.includes('baidu') || url.includes('wenxin')) return '百度文心';
+  if (url.includes('ollama')) return 'Ollama (本地)';
+  if (url.includes('lmstudio')) return 'LM Studio (本地)';
+  if (url.includes('groq')) return 'Groq';
+  if (url.includes('mistral')) return 'Mistral AI';
+  if (url.includes('cohere')) return 'Cohere';
+  return 'Unknown';
+}
 
 export default app;

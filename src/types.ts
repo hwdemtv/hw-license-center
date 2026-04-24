@@ -54,6 +54,7 @@ export interface Subscription {
     license_key: string;
     product_id: string;
     expires_at: string | null;
+    duration_days?: number | null;
 }
 
 /**
