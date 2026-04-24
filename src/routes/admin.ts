@@ -1308,7 +1308,8 @@ app.post('/ai-proxy/test', async (c) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${api_key}`
+          'Authorization': `Bearer ${api_key}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
         body: JSON.stringify(testPayload)
       });
@@ -1334,20 +1335,27 @@ app.post('/ai-proxy/test', async (c) => {
         });
       } else {
         let errorMsg = `HTTP ${response.status}`;
+        const errText = await response.text().catch(() => '');
+        
         try {
-          const errBody = await response.text();
-          if (errBody) {
-            const parsed = JSON.parse(errBody);
-            errorMsg = parsed.error?.message || parsed.error?.code || errorMsg;
+          if (errText) {
+            const parsed = JSON.parse(errText);
+            errorMsg = parsed.error?.message || parsed.error?.code || `HTTP ${response.status}: ${errText.substring(0, 100)}`;
           }
-        } catch (_) {}
+        } catch (_) {
+          // 非 JSON 的话，截取前 100 字符
+          if (errText) {
+            errorMsg = `HTTP ${response.status}: ${errText.substring(0, 100)}`;
+          }
+        }
 
         return c.json({
           success: false,
           msg: `连接失败: ${errorMsg}`,
           details: {
             status: response.status,
-            latency_ms: latency
+            latency_ms: latency,
+            raw_error: errText.substring(0, 500)
           }
         }, response.status >= 500 ? 502 : 400);
       }
