@@ -4742,10 +4742,10 @@ export const adminHtml = `<!DOCTYPE html>
 
         if (data.success) {
           const { latency_ms, provider } = data.details || {};
-          resultEl.innerHTML = `✅ <span style="color:#3fb950">连接成功</span> | ${provider || 'Unknown'} | 延迟 ${latency_ms}ms`;
+          resultEl.innerHTML = \`✅ <span style="color:#3fb950">连接成功</span> | \${provider || 'Unknown'} | 延迟 \${latency_ms}ms\`;
           resultEl.style.color = '#3fb950';
         } else {
-          resultEl.innerHTML = `❌ <span style="color:#f85149">${data.msg || '连接失败'}</span>`;
+          resultEl.innerHTML = \`❌ <span style="color:#f85149">\${data.msg || '连接失败'}</span>\`;
           resultEl.style.color = '#f85149';
         }
       } catch (e) {
