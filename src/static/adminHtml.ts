@@ -1946,19 +1946,20 @@ export const adminHtml = `<!DOCTYPE html>
                 <p class="help-text">未单独为卡密配置额度时，每个激活码每天的默认 AI 调用次数上限。</p>
               </div>
             </div>
-            <div class="form-group" style="margin-top:16px;">
-              <label>AI 代理网关总开关</label>
-              <select id="set_ai_enabled" style="width:auto; min-width:120px;">
-                <option value="true">✅ 已启用</option>
-                <option value="false">❌ 已关闭</option>
-              </select>
-              <p class="help-text">关闭后所有通过网关的 AI 请求将被拒绝。</p>
-            </div>
-            <div class="form-group" style="margin-top:16px; display:flex; align-items:center; gap:12px;">
-              <button type="button" id="btn_test_ai_connection" class="secondary" onclick="testAiConnection()" style="padding:8px 16px; font-size:13px;">
-                🔗 测试连通性
-              </button>
-              <span id="ai_test_result" style="font-size:13px; color:#8b949e;"></span>
+            <div style="display:flex; align-items:flex-end; gap:24px; margin-top:16px; padding-top:16px; border-top:1px dashed var(--border-color);">
+              <div class="form-group" style="margin-bottom:0; width:auto;">
+                <label>AI 代理网关总开关</label>
+                <select id="set_ai_enabled" style="width:auto; min-width:120px; margin-bottom:0;">
+                  <option value="true">✅ 已启用</option>
+                  <option value="false">❌ 已关闭</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0; flex:1; display:flex; align-items:center; gap:12px;">
+                <button type="button" id="btn_test_ai_connection" class="secondary" onclick="testAiConnection()" style="padding:8px 20px; font-size:13px;">
+                  🔗 测试连通性
+                </button>
+                <span id="ai_test_result" style="font-size:13px; color:#8b949e; margin-bottom:2px;"></span>
+              </div>
             </div>
           </div>
 
