@@ -8,10 +8,10 @@ const KEY_LENGTH = 64; // 512 bits
 const SALT_LENGTH = 16;
 
 /**
- * 将 ArrayBuffer 转换为十六进制字符串
+ * 将 ArrayBuffer 或 Uint8Array 转换为十六进制字符串
  */
-function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
+function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
+  return Array.from(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -50,6 +50,21 @@ async function pbkdf2(password: string, salt: Uint8Array, iterations: number, ke
 }
 
 /**
+ * 常量时间字符串比较，防止计时攻击
+ * 适用于密钥/令牌/签名等敏感字符串的等值判断
+ */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  const encA = new TextEncoder().encode(a);
+  const encB = new TextEncoder().encode(b);
+  if (encA.length !== encB.length) return false;
+  let diff = 0;
+  for (let i = 0; i < encA.length; i++) {
+    diff |= encA[i] ^ encB[i];
+  }
+  return diff === 0;
+}
+
+/**
  * 哈希密码
  * @param password 明文密码
  * @returns 哈希后的密码 (格式: iterations$salt$hash)
@@ -78,7 +93,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     if (parts.length !== 3) {
       // 兼容旧版明文密码（迁移期间）
       console.warn('[SECURITY] 检测到明文密码格式，建议尽快更新');
-      return password === storedHash;
+      return timingSafeEqualStr(password, storedHash);
     }
 
     const iterations = parseInt(parts[0], 10);

@@ -4,6 +4,7 @@
  */
 
 import { OfflineActivationData } from '../types';
+import { timingSafeEqualStr } from './crypto-helper';
 
 /**
  * 生成签名
@@ -45,7 +46,7 @@ export async function generateSignature(data: OfflineActivationData, secret: str
  */
 export async function verifySignature(data: OfflineActivationData, signature: string, secret: string): Promise<boolean> {
     const expectedSignature = await generateSignature(data, secret);
-    return expectedSignature === signature;
+    return timingSafeEqualStr(expectedSignature, signature);
 }
 
 /**

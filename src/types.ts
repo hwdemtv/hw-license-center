@@ -94,17 +94,29 @@ export interface ApiResponse<T = unknown> {
 
 // ==================== 辅助函数 ====================
 
+// 辅助函数：从字符集中无偏抽取随机字符（密码学安全随机源 + 拒绝采样消除模偏差）
+function randomCharFrom(chars: string): string {
+    const limit = Math.floor(256 / chars.length) * chars.length;
+    const buf = new Uint8Array(1);
+    let v: number;
+    do {
+        crypto.getRandomValues(buf);
+        v = buf[0];
+    } while (v >= limit);
+    return chars[v % chars.length];
+}
+
 // 辅助函数：生成随机卡密，支持传入指定前缀
 export function generateLicenseKey(prefix = 'KEY'): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const getChunk = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const getChunk = () => Array.from({ length: 4 }, () => randomCharFrom(chars)).join('');
     return `${prefix.toUpperCase().slice(0, 5)}-${getChunk()}-${getChunk()}-${getChunk()}`;
 }
 
 // 辅助函数：生成离线激活码（长码格式: OFF-XXXX-XXXX-XXXX-XXXX）
 export function generateOfflineLicenseKey(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const getChunk = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const getChunk = () => Array.from({ length: 4 }, () => randomCharFrom(chars)).join('');
     return `OFF-${getChunk()}-${getChunk()}-${getChunk()}-${getChunk()}`;
 }
 

@@ -14,12 +14,6 @@ describe('设备管理专项业务测试', () => {
         const schema = fs.readFileSync(path.resolve(__dirname, '../schema.sql'), 'utf8');
         db.exec(schema);
 
-        // 确保字段存在
-        try {
-            db.exec("ALTER TABLE Licenses ADD COLUMN unbind_count INTEGER DEFAULT 0;");
-            db.exec("ALTER TABLE Licenses ADD COLUMN last_unbind_period TEXT;");
-        } catch (e) { }
-
         d1 = createD1Mock(db);
 
         // 插入测试数据

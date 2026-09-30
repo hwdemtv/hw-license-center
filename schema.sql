@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS Licenses (
     risk_threshold INTEGER DEFAULT NULL,        -- 24h绑定阈值（NULL=自动计算，否则使用此值）
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     activated_at DATETIME,
+    unbind_count INTEGER DEFAULT 0,               -- 本月已用自助解绑次数
+    last_unbind_period TEXT,                      -- 解绑额度周期标识 (YYYY-MM)
     -- AI 代理网关专属配置 (Phase 30)
     ai_daily_quota INTEGER DEFAULT NULL,        -- 专属每日额度上限
     ai_used_today INTEGER DEFAULT 0,            -- 今日已用额度
@@ -42,12 +44,6 @@ CREATE TABLE IF NOT EXISTS Devices (
     FOREIGN KEY(license_key) REFERENCES Licenses(license_key) ON DELETE CASCADE,
     UNIQUE(license_key, device_id)
 );
-
--- 以下为可选的初始化测试数据（导入时执行）
-INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('DEFAU-TEST-KEY-1', 'default', '张三', 'active', 2);
-INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('DEFAU-TEST-KEY-2', 'default', '李四', 'active', 2);
-INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('DEFAU-TEST-KEY-3', 'default', '黑名单用户', 'revoked', 2);
-INSERT INTO Licenses (license_key, product_id, user_name, status, max_devices) VALUES ('OTHER-TEST-KEY-1', 'othertool', '王五', 'active', 1);
 
 -- 显式索引：加速 /verify 中的高频查询
 CREATE INDEX IF NOT EXISTS idx_devices_license_key ON Devices(license_key);

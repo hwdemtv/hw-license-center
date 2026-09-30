@@ -1,6 +1,9 @@
 # prod
 dist/
 
+# 本地运行时数据库文件（结构以 schema.sql 为准，不入库）
+src/db/*.sqlite
+
 # dev
 .yarn/
 !.yarn/releases

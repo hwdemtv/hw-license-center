@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { Env, generateLicenseKey } from '../types';
+import { timingSafeEqualStr } from '../utils/crypto-helper';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -32,7 +33,7 @@ app.use('/pay', async (c, next) => {
         providedToken = queryToken;
     }
 
-    if (providedToken !== secret) {
+    if (!timingSafeEqualStr(providedToken, secret)) {
         return c.json({ success: false, msg: 'Webhook 身份验证失败' }, 401);
     }
 

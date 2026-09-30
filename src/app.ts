@@ -95,13 +95,18 @@ app.use('/api/*', async (c, next) => {
         const isProduction = c.env.NODE_ENV === 'production' ||
           (!c.env.NODE_ENV && typeof process !== 'undefined' && (process as any).env.NODE_ENV === 'production');
 
-        if (isProduction) {
-          // 生产环境未配置白名单时，发出警告但仍放行同源请求
-          // 避免服务不可用，管理员应及时配置 ALLOWED_ORIGINS
-          console.warn(`[CORS] 生产环境警告: 未配置 ALLOWED_ORIGINS，建议配置以提高安全性。当前放行请求: ${origin}`);
-          return origin;
+        if (!isProduction) {
+          return origin; // 开发环境保持极简放通
         }
-        return origin; // 开发环境保持极简放通
+
+        // 生产环境未配置白名单：仅放行同源请求（obsidian:// / app:// 内部协议已在上方放行），
+        // 其余跨域来源不回发 ACAO 头，交由浏览器同源策略默认阻断
+        try {
+          const reqHost = new URL(c.req.url).host;
+          if (new URL(origin).host === reqHost) return origin;
+        } catch (_) { /* Origin 无法解析时按未授权处理 */ }
+        console.warn(`[CORS] 生产环境未配置 ALLOWED_ORIGINS，已阻断跨域请求: ${origin}。如需放行请在环境变量中配置白名单。`);
+        return null;
       }
 
       // 如果配置了白名单，则严格匹配
