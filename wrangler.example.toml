@@ -17,6 +17,9 @@ database_id = "<YOUR_D1_DATABASE_ID>" # Replace with your real DB ID, you can ge
 
 # Variables
 [vars]
+# 生产环境标识：CORS 在未配置 ALLOWED_ORIGINS 时将阻断未授权跨域请求。
+# 本地开发如需宽松跨域，可用 `npx wrangler dev --var NODE_ENV:development` 覆盖。
+NODE_ENV = "production"
 # (Optional) Comma separated domains to allow CORS requests from. If empty, allows '*'.
 # ALLOWED_ORIGINS = "https://your-domain.com, https://another-domain.com"
 
