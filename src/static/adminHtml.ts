@@ -309,11 +309,12 @@ export const adminHtml = `<!DOCTYPE html>
       border-color: rgba(255, 255, 255, 0.08);
     }
 
-    /* 快捷操作栏：固定在顶部工具栏下方，滚动看板时保持可见 */
-    .quick-actions-bar {
-      position: sticky;
-      top: var(--header-h);
-      z-index: 150;
+    /* 顶部工具栏快捷操作：与刷新按钮同行，所有页面可见 */
+    .toolbar-quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-right: auto;
     }
 
     .form-grid {
@@ -1266,6 +1267,10 @@ export const adminHtml = `<!DOCTYPE html>
       .hamburger-btn {
         display: flex !important;
       }
+      /* 移动端隐藏顶部快捷操作，避免工具栏拥挤 */
+      .toolbar-quick-actions {
+        display: none;
+      }
       /* 遮罩层 */
       .sidebar-overlay {
         display: block !important;
@@ -1379,6 +1384,13 @@ export const adminHtml = `<!DOCTYPE html>
   <main class="main-content">
     <div class="top-toolbar">
       <button class="hamburger-btn" onclick="toggleSidebar()" title="菜单">☰</button>
+      <div class="toolbar-quick-actions">
+        <button class="secondary" onclick="switchTab('generate')">✨ 生成新卡密</button>
+        <button class="secondary" onclick="switchTab('offline')">🔌 离线激活</button>
+        <button class="secondary" onclick="switchTab('manage')">🛠️ 资产管理</button>
+        <button class="secondary" onclick="switchTab('notifications')">📢 发布通知</button>
+        <button class="secondary" onclick="switchTab('settings')">⚙️ 系统设置</button>
+      </div>
       <button class="secondary" onclick="refreshCurrentTab()">🔄 刷新</button>
     </div>
 
@@ -1389,18 +1401,6 @@ export const adminHtml = `<!DOCTYPE html>
 
     <!--Tab: Dashboard-->
     <div id="sec-dashboard" class="section active">
-      <!-- 快捷操作(固定在顶部) -->
-      <div class="card quick-actions-bar">
-        <h3 style="margin:0 0 16px; font-size:15px;">🚀 快捷操作</h3>
-        <div style="display:flex; flex-wrap:wrap; gap:10px;">
-          <button class="primary" onclick="switchTab('generate')">✨ 生成新卡密</button>
-          <button class="secondary" onclick="switchTab('offline')">🔌 离线激活</button>
-          <button class="secondary" onclick="switchTab('manage')">🛠️ 资产管理</button>
-          <button class="secondary" onclick="switchTab('notifications')">📢 发布通知</button>
-          <button class="secondary" onclick="switchTab('settings')">⚙️ 系统设置</button>
-        </div>
-      </div>
-
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
           <h2 style="margin:0; font-size:18px;">📊 数据看板</h2>
@@ -2634,7 +2634,8 @@ export const adminHtml = `<!DOCTYPE html>
       currentTab = tab;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      const target = (event && event.target) ? event.target : document.querySelector('.tab[onclick*="' + tab + '"]');
+      // 优先高亮侧边栏对应标签（工具栏快捷按钮、统计卡等非侧边栏入口点击时 event.target 不是 .tab）
+      const target = document.querySelector('.tab[onclick*="' + tab + '"]') || ((event && event.target) ? event.target : null);
       if (target) target.classList.add('active');
       document.getElementById('sec-' + tab).classList.add('active');
       if (tab === 'dashboard') loadDashboard();
