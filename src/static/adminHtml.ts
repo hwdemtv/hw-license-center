@@ -309,6 +309,13 @@ export const adminHtml = `<!DOCTYPE html>
       border-color: rgba(255, 255, 255, 0.08);
     }
 
+    /* 快捷操作栏：固定在顶部工具栏下方，滚动看板时保持可见 */
+    .quick-actions-bar {
+      position: sticky;
+      top: var(--header-h);
+      z-index: 150;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1382,6 +1389,18 @@ export const adminHtml = `<!DOCTYPE html>
 
     <!--Tab: Dashboard-->
     <div id="sec-dashboard" class="section active">
+      <!-- 快捷操作(固定在顶部) -->
+      <div class="card quick-actions-bar">
+        <h3 style="margin:0 0 16px; font-size:15px;">🚀 快捷操作</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <button class="primary" onclick="switchTab('generate')">✨ 生成新卡密</button>
+          <button class="secondary" onclick="switchTab('offline')">🔌 离线激活</button>
+          <button class="secondary" onclick="switchTab('manage')">🛠️ 资产管理</button>
+          <button class="secondary" onclick="switchTab('notifications')">📢 发布通知</button>
+          <button class="secondary" onclick="switchTab('settings')">⚙️ 系统设置</button>
+        </div>
+      </div>
+
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
           <h2 style="margin:0; font-size:18px;">📊 数据看板</h2>
@@ -1472,18 +1491,6 @@ export const adminHtml = `<!DOCTYPE html>
         <h3 style="margin:0 0 16px; font-size:15px;">⚡ 特权与配置统计</h3>
         <div id="privilegeStats" style="min-height:80px;">
           <div style="text-align:center; padding:30px; color:var(--text-main);">加载中...</div>
-        </div>
-      </div>
-
-      <!-- 快捷操作 -->
-      <div class="card">
-        <h3 style="margin:0 0 16px; font-size:15px;">🚀 快捷操作</h3>
-        <div style="display:flex; flex-wrap:wrap; gap:10px;">
-          <button class="primary" onclick="switchTab('generate')">✨ 生成新卡密</button>
-          <button class="secondary" onclick="switchTab('offline')">🔌 离线激活</button>
-          <button class="secondary" onclick="switchTab('manage')">🛠️ 资产管理</button>
-          <button class="secondary" onclick="switchTab('notifications')">📢 发布通知</button>
-          <button class="secondary" onclick="switchTab('settings')">⚙️ 系统设置</button>
         </div>
       </div>
     </div>

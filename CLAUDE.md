@@ -97,9 +97,18 @@ Four main tables (see `schema.sql`):
 
 ### Rate Limiting
 
-Rate limits are enforced via Cloudflare KV (`RATE_LIMITER` binding):
+Rate limits use a three-tier fallback (see `src/middleware/rate-limiter.ts`):
+1. **D1 atomic counter** (primary): single `INSERT ... ON CONFLICT ... RETURNING` UPSERT against the `RateLimit` table — quota is independent from KV (free tier: 100k D1 row writes/day vs 1k KV writes/day)
+2. **KV** (`RATE_LIMITER` binding): fallback when D1 errors (e.g. unmigrated DB)
+3. **In-memory**: local Node.js development
+
+Client keys normalize IPv6 addresses to their /64 prefix (rotating privacy temporary addresses would otherwise create a fresh key per connection, defeating limiting and bloating storage).
+
+Limits:
 - `/api/v1/auth/verify`: 15 req/60s
 - `/api/v1/auth/unbind`: 5 req/60s
+- `/api/v1/auth/portal/*`: 5 req/60s
+- `/api/v1/auth/webhook/*`: 20 req/60s
 - `/api/v1/auth/admin/*`: 100 req/60s
 - `/api/v1/ai/*`: 10 req/60s
 

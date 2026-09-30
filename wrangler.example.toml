@@ -15,6 +15,12 @@ binding = "DB" # Available in your code as env.DB
 database_name = "smart-mp-db"
 database_id = "<YOUR_D1_DATABASE_ID>" # Replace with your real DB ID, you can get it by running: npx wrangler d1 create smart-mp-db
 
+# (可选) KV 限流兜底存储。限流主路径为 D1 原子计数(见 schema.sql 的 RateLimit 表)，
+# D1 不可用时自动降级到该 KV，再降级到进程内存。
+# [[kv_namespaces]]
+# binding = "RATE_LIMITER"
+# id = "<YOUR_KV_NAMESPACE_ID>"
+
 # Variables
 [vars]
 # 生产环境标识：CORS 在未配置 ALLOWED_ORIGINS 时将阻断未授权跨域请求。

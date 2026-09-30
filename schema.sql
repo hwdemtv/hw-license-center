@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS Notifications (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 限流计数表（D1 原子限流主路径，配额独立于 KV）
+CREATE TABLE IF NOT EXISTS RateLimit (
+    key TEXT PRIMARY KEY,                 -- 限流键 (ratelimit:ip:path)
+    count INTEGER NOT NULL DEFAULT 0,     -- 当前窗口内计数
+    reset_at INTEGER NOT NULL             -- 窗口重置时间 (Unix 秒)
+);
+
 -- ==========================================
 -- AI 代理网关扩展 (Phase 30: BFF AI Proxy)
 -- ==========================================
