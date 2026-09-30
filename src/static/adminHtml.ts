@@ -2972,7 +2972,7 @@ export const adminHtml = `<!DOCTYPE html>
           if (hasExpired) expired++;
         });
 
-        const total = data.data.length || 1;
+        const total = licenses.length || 1;
         const permanentPct = Math.round(permanent / total * 100);
         const validPct = Math.round(valid / total * 100);
         const expiring7Pct = Math.round(expiring7 / total * 100);
