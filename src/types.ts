@@ -94,6 +94,13 @@ export interface ApiResponse<T = unknown> {
 
 // ==================== 辅助函数 ====================
 
+// 检测标识符（卡密/设备ID）是否含 HTML 元字符。
+// 纵深防御：合法卡密与设备ID（UUID/哈希/机器码）不含这些字符，
+// 从入口拒绝即可消灭存储型 XSS 载荷（前端转义仍是第一道防线）。
+export function hasHtmlMetachars(value: unknown): boolean {
+    return typeof value === 'string' && /[<>"'`]/.test(value);
+}
+
 // 辅助函数：从字符集中无偏抽取随机字符（密码学安全随机源 + 拒绝采样消除模偏差）
 function randomCharFrom(chars: string): string {
     const limit = Math.floor(256 / chars.length) * chars.length;

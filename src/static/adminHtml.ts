@@ -1332,6 +1332,9 @@ export const adminHtml = `<!DOCTYPE html>
           onclick="const i=document.getElementById('globalSecret');if(i.type==='password'){i.type='text';this.innerText='🙈'}else{i.type='password';this.innerText='👁️'}"
           style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; opacity:0.6; user-select:none;">👁️</span>
       </div>
+      <label style="display:flex; align-items:center; gap:6px; margin-top:12px; font-size:12px; color:var(--text-main); cursor:pointer; user-select:none;">
+        <input type="checkbox" id="rememberSecret" checked> 记住密钥（取消勾选则仅本次浏览器会话有效）
+      </label>
       <button class="primary" style="width:100%; margin-top:16px;" onclick="login()"> 进入控制台 </button>
     </div>
   </div>
@@ -2040,6 +2043,13 @@ export const adminHtml = `<!DOCTYPE html>
         .replace(/'/g, '&#39;');
     }
 
+    // 内联 onclick 参数专用转义：先做 JS 字符串转义（反斜杠与单引号），再叠加 HTML 转义。
+    // 顺序不可颠倒：HTML 解码发生在 JS 解析之前。
+    function escapeJsArg(str) {
+      if (str === null || str === undefined) return '';
+      return escapeHTML(String(str).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'"));
+    }
+
     // 截断卡密显示（移动端优化）
     function truncateKey(key) {
       if (!key || key.length <= 14) return key;
@@ -2047,6 +2057,21 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     let ADMIN_SECRET = "";
+    // 全局 401 拦截：任何携带管理凭据的请求一旦鉴权失败即自动登出，
+    // 避免密钥轮换后页面停留在"半失效"状态（各处 fetch 只报错不登出的问题统一在此收口）
+    const _origFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+      const headers = (init && init.headers) || {};
+      const hasAuth = typeof headers === 'object' &&
+        Object.values(headers).some(v => String(v).indexOf('Bearer ') === 0 && String(v) !== 'Bearer ');
+      return _origFetch(input, init).then(res => {
+        if (res.status === 401 && hasAuth && ADMIN_SECRET) {
+          showToast('登录凭据已失效，请重新登录', 'error');
+          logout();
+        }
+        return res;
+      });
+    };
     let ALL_LICENSES = []; // 本地数据缓存
     let SET_SELECTED_KEYS = new Set(); // 批量选中的 keys
     // 分页状态
@@ -2202,6 +2227,16 @@ export const adminHtml = `<!DOCTYPE html>
       return params;
     }
 
+    // 重置全部高级筛选下拉（生成卡密后清场，避免残留筛选隐藏新卡）
+    function resetAdvancedFilters() {
+      ['filterLicenseType', 'filterUserStatus', 'filterSubProduct', 'filterSubExpiry',
+       'filterDateStart', 'filterDateEnd', 'filterDeviceUsage', 'filterOfflinePriv', 'filterAiPriv'
+      ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+
     // 导出选项对话框
     const EXPORT_FIELDS = [
       { key: 'license_key', label: '激活码', default: true },
@@ -2345,7 +2380,9 @@ export const adminHtml = `<!DOCTYPE html>
           }
           if (val === null || val === undefined) val = '';
           // CSV 转义
-          const str = String(val).replace(/"/g, '""');
+          let str = String(val).replace(/"/g, '""');
+          // 公式注入防护：以 = + - @ 开头的单元格在 Excel/WPS 中会被当作公式执行，前置单引号使其按文本处理
+          if (/^[=+\\-@\\t\\r]/.test(str)) str = "'" + str;
           return '"' + str + '"';
         });
         csvContent += row.join(',') + '\\n';
@@ -2392,16 +2429,6 @@ export const adminHtml = `<!DOCTYPE html>
     // 统计数据缓存
     let statsCache = null;
     let statsCacheTime = 0;
-    const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
-
-    async function getStatsWithCache(forceRefresh = false) {
-      const now = Date.now();
-      if (!forceRefresh && statsCache && (now - statsCacheTime) < STATS_CACHE_DURATION) {
-        return statsCache;
-      }
-      // 从 loadLicenses 的返回值中获取
-      return statsCache;
-    }
 
     // 用户头像颜色哈希
     function getAvatarColor(name) {
@@ -2446,7 +2473,7 @@ export const adminHtml = `<!DOCTYPE html>
       }
       const toast = document.createElement('div');
       toast.className = \`toast \${type}\`;
-      toast.innerHTML = message;
+      toast.textContent = message;
       container.appendChild(toast);
 
       setTimeout(() => {
@@ -2466,16 +2493,19 @@ export const adminHtml = `<!DOCTYPE html>
           inputsDiv.style.display = 'grid';
           let htmlInputs = '';
           options.inputs.forEach((inp, i) => {
+            const safeLabel = escapeHTML(inp.label || '');
+            const safeVal = escapeHTML(inp.value || '');
+            const safePh = escapeHTML(inp.placeholder || '');
             if (inp.type === 'password') {
-              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="pwd-input-wrapper"><input type="password" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '') + '"><span class="pwd-toggle" onclick="const inp=this.previousElementSibling; inp.type=inp.type===\\'password\\'?\\'text\\':\\'password\\'; this.innerText=inp.type===\\'password\\'?\\'👁️\\':\\'🙈\\';">👁️</span></div></div>';
+              htmlInputs += '<div class="form-group"><label>' + safeLabel + '</label><div class="pwd-input-wrapper"><input type="password" id="modalInp' + i + '" value="' + safeVal + '" placeholder="' + safePh + '"><span class="pwd-toggle" onclick="const inp=this.previousElementSibling; inp.type=inp.type===\\'password\\'?\\'text\\':\\'password\\'; this.innerText=inp.type===\\'password\\'?\\'👁️\\':\\'🙈\\';">👁️</span></div></div>';
             } else if (inp.type === 'productSelect') {
               // 产品下拉选择类型
-              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '输入或选择产品') + '" autocomplete="off" onfocus="loadAndShowProducts(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProducts(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
+              htmlInputs += '<div class="form-group"><label>' + safeLabel + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + safeVal + '" placeholder="' + (inp.placeholder ? escapeHTML(inp.placeholder) : '输入或选择产品') + '" autocomplete="off" onfocus="loadAndShowProducts(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProducts(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
             } else if (inp.type === 'productMultiSelect') {
               // 产品多选下拉类型（支持逗号分隔多选）
-              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '点击选择多个产品') + '" autocomplete="off" onfocus="loadAndShowProductsMulti(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProductsMulti(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
+              htmlInputs += '<div class="form-group"><label>' + safeLabel + '</label><div class="dropdown-container"><input type="text" id="modalInp' + i + '" value="' + safeVal + '" placeholder="' + (inp.placeholder ? escapeHTML(inp.placeholder) : '点击选择多个产品') + '" autocomplete="off" onfocus="loadAndShowProductsMulti(\\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')" oninput="filterProductsMulti(this.value, \\'modalInp' + i + '\\', \\'modalDropdown' + i + '\\')"><div id="modalDropdown' + i + '" class="custom-dropdown" style="max-height: 200px; overflow-y: auto;"></div></div></div>';
             } else {
-              htmlInputs += '<div class="form-group"><label>' + inp.label + '</label><input type="' + (inp.type || 'text') + '" id="modalInp' + i + '" value="' + (inp.value || '') + '" placeholder="' + (inp.placeholder || '') + '"></div>';
+              htmlInputs += '<div class="form-group"><label>' + safeLabel + '</label><input type="' + (inp.type || 'text') + '" id="modalInp' + i + '" value="' + safeVal + '" placeholder="' + safePh + '"></div>';
             }
           });
           inputsDiv.innerHTML = htmlInputs;
@@ -2548,7 +2578,15 @@ export const adminHtml = `<!DOCTYPE html>
         const data = await res.json();
 
         ADMIN_SECRET = s;
-        localStorage.setItem('hw_admin_secret', s);
+        // 勾选"记住我"才持久化到 localStorage；否则仅存 sessionStorage（关闭标签页即失效）
+        const remember = document.getElementById('rememberSecret') && document.getElementById('rememberSecret').checked;
+        if (remember) {
+          localStorage.setItem('hw_admin_secret', s);
+          sessionStorage.removeItem('hw_admin_secret');
+        } else {
+          sessionStorage.setItem('hw_admin_secret', s);
+          localStorage.removeItem('hw_admin_secret');
+        }
         document.getElementById('adminAuth').style.display = 'none';
         loadDashboard(); // 加载看板数据
         loadSettings(); // 并行加载全局配置并同步默认值到生卡面板
@@ -2562,6 +2600,8 @@ export const adminHtml = `<!DOCTYPE html>
     function logout() {
       ADMIN_SECRET = "";
       localStorage.removeItem('hw_admin_secret');
+      sessionStorage.removeItem('hw_admin_secret');
+      dashboardLicensesCache = null;
       document.getElementById('globalSecret').value = '';
       document.getElementById('adminAuth').style.display = 'flex';
       document.getElementById('licListContainer').innerHTML = '';
@@ -2569,9 +2609,9 @@ export const adminHtml = `<!DOCTYPE html>
       updateStats();
     }
 
-    // 页面加载时自动尝试从本地缓存恢复会话
+    // 页面加载时自动尝试从本地缓存恢复会话（会话级密钥优先于持久密钥）
     window.addEventListener('DOMContentLoaded', () => {
-      const savedSecret = localStorage.getItem('hw_admin_secret');
+      const savedSecret = sessionStorage.getItem('hw_admin_secret') || localStorage.getItem('hw_admin_secret');
       if (savedSecret) {
         document.getElementById('globalSecret').value = savedSecret;
         login();
@@ -2770,15 +2810,29 @@ export const adminHtml = `<!DOCTYPE html>
       if (privEl) privEl.innerHTML = privilegeHtml;
     }
 
+    // 看板共享数据缓存：详情页四块统计同源拉取全量卡密，
+    // 缓存 30 秒避免一次切页重复打 4 次全量请求
+    let dashboardLicensesCache = null;
+    let dashboardLicensesCacheTime = 0;
+    async function fetchAllLicensesCached() {
+      const now = Date.now();
+      if (dashboardLicensesCache && (now - dashboardLicensesCacheTime) < 30000) {
+        return dashboardLicensesCache;
+      }
+      const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
+        headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+      });
+      const data = await res.json();
+      if (!data.success) return null;
+      dashboardLicensesCache = data.data;
+      dashboardLicensesCacheTime = now;
+      return dashboardLicensesCache;
+    }
+
     async function getDeviceUsageHtml() {
       try {
-        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
-          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
-        });
-        const data = await res.json();
-        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
-
-        const licenses = data.data;
+        const licenses = await fetchAllLicensesCached();
+        if (!licenses) return '<div style="color:var(--danger);">加载失败</div>';
         let unused = 0, partial = 0, full = 0;
         let totalDevices = 0, totalQuota = 0;
 
@@ -2835,12 +2889,8 @@ export const adminHtml = `<!DOCTYPE html>
         });
         const data = await res.json();
 
-        const licRes = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
-          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
-        });
-        const licData = await licRes.json();
-
-        if (!data.success || !licData.success) return '<div style="color:var(--danger);">加载失败</div>';
+        const licData = { success: true, data: await fetchAllLicensesCached() };
+        if (!data.success || !licData.data) return '<div style="color:var(--danger);">加载失败</div>';
 
         // 统计每个产品的卡密数
         const productCount = {};
@@ -2870,7 +2920,7 @@ export const adminHtml = `<!DOCTYPE html>
           html += \`
             <div style="margin-bottom:10px;">
               <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
-                <span style="color:var(--text-bright); font-weight:500;">\${pid}</span>
+                <span style="color:var(--text-bright); font-weight:500;">\${escapeHTML(pid)}</span>
                 <span style="color:var(--text-main);">\${count} 个 (\${pct}%)</span>
               </div>
               <div style="height:8px; background:var(--border-color); border-radius:4px; overflow:hidden;">
@@ -2888,16 +2938,13 @@ export const adminHtml = `<!DOCTYPE html>
 
     async function getSubscriptionHtml() {
       try {
-        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
-          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
-        });
-        const data = await res.json();
-        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
+        const licenses = await fetchAllLicensesCached();
+        if (!licenses) return '<div style="color:var(--danger);">加载失败</div>';
 
         const now = new Date();
         let permanent = 0, valid = 0, expiring7 = 0, expiring30 = 0, expired = 0, nosub = 0;
 
-        data.data.forEach(l => {
+        licenses.forEach(l => {
           if (!l.subscriptions || l.subscriptions.length === 0) {
             nosub++;
             return;
@@ -2984,15 +3031,12 @@ export const adminHtml = `<!DOCTYPE html>
 
     async function getPrivilegeHtml() {
       try {
-        const res = await fetch('/api/v1/auth/admin/licenses?limit=9999', {
-          headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
-        });
-        const data = await res.json();
-        if (!data.success) return '<div style="color:var(--danger);">加载失败</div>';
+        const licenses = await fetchAllLicensesCached();
+        if (!licenses) return '<div style="color:var(--danger);">加载失败</div>';
 
         let offlinePriv = 0, aiPriv = 0, aiModelPriv = 0;
 
-        data.data.forEach(l => {
+        licenses.forEach(l => {
           if (l.offline_days_override != null) offlinePriv++;
           if (l.ai_daily_quota != null && l.ai_daily_quota > 0) aiPriv++;
           if (l.ai_model_override || l.ai_base_override) aiModelPriv++;
@@ -3093,12 +3137,6 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     // 生卡区选择产品 ID 的辅助函数
-    function setGenProduct(val) {
-      document.getElementById('genProductId').value = val;
-      updateProductHelpers();
-      hideDropdown();
-    }
-
     // 从服务器加载所有产品并显示下拉框
     let ALL_PRODUCTS_CACHE = [];
     async function loadAndShowProducts(inputId = 'genProductId', dropdownId = 'productDropdown') {
@@ -3139,7 +3177,7 @@ export const adminHtml = `<!DOCTYPE html>
         // 输入的是新产品
         dropdown.innerHTML = \`
           <div style="padding:8px 12px; font-size:12px; color:var(--text-main); border-bottom:1px solid var(--border-color);">
-            📝 将创建新产品: <b style="color:var(--accent);">\${searchVal}</b>
+            📝 将创建新产品: <b style="color:var(--accent);">\${escapeHTML(searchVal)}</b>
           </div>
           <div style="padding:8px 12px; font-size:11px; color:var(--success);">
             ✓ 点击其他地方确认输入
@@ -3162,8 +3200,8 @@ export const adminHtml = `<!DOCTYPE html>
         let listHtml = '<div style="padding:6px 12px; font-size:11px; color:var(--text-main); background:var(--panel-bg); border-bottom:1px solid var(--border-color);">📦 已有产品（点击选择）</div>';
         products.forEach(p => {
           const isSelected = p === currentVal ? '✓ ' : '';
-          listHtml += \`<div class="dropdown-item" onclick="setProductValue('\${inputId}', '\${p}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>\${isSelected}\${p}</span>
+          listHtml += \`<div class="dropdown-item" onclick="setProductValue('\${inputId}', '\${escapeJsArg(p)}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>\${isSelected}\${escapeHTML(p)}</span>
           </div>\`;
         });
         dropdown.innerHTML = listHtml;
@@ -3228,8 +3266,8 @@ export const adminHtml = `<!DOCTYPE html>
           const isSelected = currentValues.includes(p);
           const checkMark = isSelected ? '✓ ' : '';
           const bgStyle = isSelected ? 'background:var(--accent-glow);' : '';
-          listHtml += \`<div class="dropdown-item" onclick="toggleProductMulti('\${inputId}', '\${p}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center; \${bgStyle}">
-            <span>\${checkMark}\${p}</span>
+          listHtml += \`<div class="dropdown-item" onclick="toggleProductMulti('\${inputId}', '\${escapeJsArg(p)}', '\${dropdownId}')" style="display:flex; justify-content:space-between; align-items:center; \${bgStyle}">
+            <span>\${checkMark}\${escapeHTML(p)}</span>
           </div>\`;
         });
         listHtml += \`<div style="padding:8px; border-top:1px solid var(--border-color); position:sticky; bottom:0; background:var(--panel-bg); z-index:10;">
@@ -3308,9 +3346,9 @@ export const adminHtml = `<!DOCTYPE html>
       } else {
         let listHtml = '';
         matches.forEach(p => {
-          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${p}')">\` +
-            \`<span>\${p}</span>\` +
-            \`<div class="remove-btn" onclick="removeFromHistory(event, '\${p}')" title="从历史中移除">✕</div>\` +
+          listHtml += \`<div class="dropdown-item" onclick="setGenProduct('\${escapeJsArg(p)}')">\` +
+            \`<span>\${escapeHTML(p)}</span>\` +
+            \`<div class="remove-btn" onclick="removeFromHistory(event, '\${escapeJsArg(p)}')" title="从历史中移除">✕</div>\` +
             \`</div>\`;
         });
         dropdown.innerHTML = listHtml;
@@ -3325,7 +3363,10 @@ export const adminHtml = `<!DOCTYPE html>
     });
 
     // 后端游标加载数据
+    // 竞态守卫：筛选/翻页快速切换时，晚发出的请求序号更大，早请求的过期响应直接丢弃
+    let loadLicensesSeq = 0;
     async function loadLicenses() {
+      const seq = ++loadLicensesSeq;
       const searchKw = document.getElementById('keywordSearch') ? document.getElementById('keywordSearch').value.trim() : '';
       const pId = document.getElementById('filterProductId') ? document.getElementById('filterProductId').value : '';
       const container = document.getElementById('licListContainer');
@@ -3362,6 +3403,9 @@ export const adminHtml = `<!DOCTYPE html>
           headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
         });
         const data = await res.json();
+
+        // 过期响应丢弃：期间用户已切换筛选或翻页
+        if (seq !== loadLicensesSeq) return;
 
         container.style.opacity = '1';
 
@@ -3485,13 +3529,13 @@ export const adminHtml = `<!DOCTYPE html>
               textColor = '#a371f7';
               bgColor = 'rgba(163, 113, 247, 0.1)';
             }
-            subHtml += '<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-size:11px; background:' + bgColor + '; color:' + textColor + '; border-radius:4px; margin-right:4px;"><span style="color:var(--text-main);">' + s.product_id + ':</span> ' + text + '</span>';
+            subHtml += '<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-size:11px; background:' + bgColor + '; color:' + textColor + '; border-radius:4px; margin-right:4px;"><span style="color:var(--text-main);">' + escapeHTML(s.product_id) + ':</span> ' + text + '</span>';
           });
 
           // 折叠显示更多订阅
           if (hiddenCount > 0) {
             const hiddenSubs = lic.subscriptions.slice(MAX_VISIBLE_SUBS);
-            const tooltip = hiddenSubs.map(s => s.product_id + ': ' + (s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '永久')).join('\\n');
+            const tooltip = hiddenSubs.map(s => escapeHTML(s.product_id + ': ' + (s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '永久'))).join('\\n');
             subHtml += '<span class="badge" style="background:var(--card-bg); color:var(--text-main); cursor:help;" title="' + tooltip + '">+' + hiddenCount + '</span>';
           }
         } else {
@@ -3499,7 +3543,7 @@ export const adminHtml = `<!DOCTYPE html>
         }
 
         const isRevoked = lic.status === 'revoked';
-        const devicePct = Math.min(100, (lic.current_devices / lic.max_devices) * 100);
+        const devicePct = lic.max_devices > 0 ? Math.min(100, (lic.current_devices / lic.max_devices) * 100) : 0;
 
         // 用户头像颜色哈希
         const avatarColor = getAvatarColor(lic.user_name);
@@ -3508,24 +3552,24 @@ export const adminHtml = `<!DOCTYPE html>
       <div class="lic-row" style="grid-template-columns: 30px 1.5fr 1.5fr 1fr 1fr;\${isRevoked ? ' opacity:0.6;' : ''}">
         <!-- Col 0: Checkbox -->
         <div style="display:flex; align-items:center;">
-          <input type="checkbox" class="custom-checkbox row-checkbox" value="\${lic.license_key}" \${SET_SELECTED_KEYS.has(lic.license_key) ? 'checked' : ''} onclick="toggleBatchItem('\${lic.license_key}', this.checked)">
+          <input type="checkbox" class="custom-checkbox row-checkbox" value="\${escapeHTML(lic.license_key)}" \${SET_SELECTED_KEYS.has(lic.license_key) ? 'checked' : ''} onclick="toggleBatchItem('\${escapeJsArg(lic.license_key)}', this.checked)">
         </div>
 
         <!-- Col 1: 基本信息 -->
         <div style="display:flex; align-items:center; gap:12px; min-width:0;">
           <div style="width:36px; height:36px; flex-shrink:0; background:\${avatarColor}; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:14px;">
-            \${(lic.user_name || '?')[0].toUpperCase()}
+            \${escapeHTML((lic.user_name || '?')[0] ? (lic.user_name || '?')[0].toUpperCase() : '?')}
           </div>
           <div style="min-width:0; overflow:hidden;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
               <span style="font-weight:600; font-size:13px; color:var(--text-bright); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${lic.user_name ? escapeHTML(lic.user_name) : '<span style="color:var(--text-main); font-style:italic">未指定用户</span>'}</span>
-              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('\${lic.license_key}','\${lic.user_name ? escapeHTML(lic.user_name.replace(/'/g, "\\\\'")) : ""}')" title="修改用户备注">✏️</span>
+              <span style="cursor:pointer; opacity:0.6; font-size:11px;" onclick="editUserName('\${escapeJsArg(lic.license_key)}','\${escapeJsArg(lic.user_name || '')}')" title="修改用户备注">✏️</span>
               <span class="badge \${isRevoked ? 'badge-danger' : 'badge-success'}" style="transform: scale(0.85); transform-origin:left; margin-left:2px;">\${lic.status.toUpperCase()}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
-              <span class="license-key-desktop" style="font-family:monospace; font-size:12px; color:var(--text-main);">\${lic.license_key}</span>
-              <span class="license-key-mobile" style="font-family:monospace; font-size:12px; color:var(--text-main); display:none;">\${truncateKey(lic.license_key)}</span>
-              <span style="cursor:pointer; opacity:0.6; font-size:12px;" onclick="copyText('\${lic.license_key}')" title="复制卡密">📋</span>
+              <span class="license-key-desktop" style="font-family:monospace; font-size:12px; color:var(--text-main);">\${escapeHTML(lic.license_key)}</span>
+              <span class="license-key-mobile" style="font-family:monospace; font-size:12px; color:var(--text-main); display:none;">\${escapeHTML(truncateKey(lic.license_key))}</span>
+              <span style="cursor:pointer; opacity:0.6; font-size:12px;" onclick="copyText('\${escapeJsArg(lic.license_key)}')" title="复制卡密">📋</span>
             </div>
           </div>
         </div>
@@ -3542,14 +3586,14 @@ export const adminHtml = `<!DOCTYPE html>
           \${(lic.ai_model_override || lic.ai_base_override)
             ? \`<span class="badge" style="background:rgba(210, 153, 34, 0.1); color:var(--warning); border: 1px solid rgba(210, 153, 34, 0.2);" title="已重写专属大模型或代理专线">👑 专属模型</span>\`
             : ''}
-          <span onclick="addSub('\${lic.license_key}')" style="color:var(--accent); cursor:pointer; font-weight:500; font-size:11px; margin-left:4px; padding:2px 6px; background:var(--accent-glow); border-radius:4px;">+ 续费管理</span>
+          <span onclick="addSub('\${escapeJsArg(lic.license_key)}')" style="color:var(--accent); cursor:pointer; font-weight:500; font-size:11px; margin-left:4px; padding:2px 6px; background:var(--accent-glow); border-radius:4px;">+ 续费管理</span>
         </div>
 
         <!-- Col 3: 设备占用 -->
         <div style="font-size:12px; display:flex; flex-direction:column; justify-content:center;">
           <div style="color:var(--text-bright); margin-bottom:4px; font-weight:500; display:flex; align-items:center;">
             <div style="flex-shrink:0;">\${lic.current_devices} <span style="color:var(--text-main); font-weight:normal;">/ \${lic.max_devices} 台</span></div>
-            <button class="secondary" onclick="toggleDevicePanel('\${lic.license_key}')" style="margin-left:6px; padding:2px 6px; font-size:11px; height:auto; background:var(--panel-bg); border-color:#30363d; flex-shrink:0;" title="展开查看具体设备">🔍 详情</button>
+            <button class="secondary" onclick="toggleDevicePanel('\${escapeJsArg(lic.license_key)}')" style="margin-left:6px; padding:2px 6px; font-size:11px; height:auto; background:var(--panel-bg); border-color:#30363d; flex-shrink:0;" title="展开查看具体设备">🔍 详情</button>
           </div>
           <div style="height:4px; width:100%; max-width:80px; background:#30363d; border-radius:2px; overflow:hidden;">
             <div style="width:\${devicePct}%; height:100%; background:\${devicePct >= 100 ? 'var(--danger)' : devicePct >= 80 ? 'var(--warning)' : 'var(--accent)'};"></div>
@@ -3558,14 +3602,14 @@ export const adminHtml = `<!DOCTYPE html>
 
         <!-- Col 4: 操作 -->
         <div style="display:flex; gap:6px; justify-content:flex-end;">
-          <button class="icon-btn \${isRevoked ? 'icon-btn-success' : 'icon-btn-warning'}" onclick="toggleStatus('\${lic.license_key}', '\${isRevoked ? 'active' : 'revoked'}')" title="\${isRevoked ? '恢复' : '吊销'}">
+          <button class="icon-btn \${isRevoked ? 'icon-btn-success' : 'icon-btn-warning'}" onclick="toggleStatus('\${escapeJsArg(lic.license_key)}', '\${isRevoked ? 'active' : 'revoked'}')" title="\${isRevoked ? '恢复' : '吊销'}">
             \${isRevoked ? '🔓' : '🔒'}
           </button>
-          <button class="icon-btn icon-btn-danger" onclick="deleteLic('\${lic.license_key}')" title="彻底删除">🗑️</button>
+          <button class="icon-btn icon-btn-danger" onclick="deleteLic('\${escapeJsArg(lic.license_key)}')" title="彻底删除">🗑️</button>
         </div>
       </div>
       <!-- 动态设备面板插槽 -->
-      <div id="devicePanel_\${lic.license_key}" style="display:none; grid-column:1/-1; background:#0d1117; border-top:1px dashed #30363d; padding:12px 16px; max-height: 350px; overflow-y: auto;"></div>
+      <div id="devicePanel_\${escapeHTML(lic.license_key)}" style="display:none; grid-column:1/-1; background:#0d1117; border-top:1px dashed #30363d; padding:12px 16px; max-height: 350px; overflow-y: auto;"></div>
     \`;
       });
 
@@ -3720,11 +3764,12 @@ export const adminHtml = `<!DOCTYPE html>
           document.getElementById('genResult').style.display = 'block';
           document.getElementById('genOutput').innerText = data.keys.join('\\n');
 
-          // 心智流转：重置列表视图属性
+          // 心智流转：重置列表视图属性（含高级筛选，避免新卡被残留筛选隐藏）
           clearBatchSelection();
           data.keys.forEach(k => SET_SELECTED_KEYS.add(k));
           document.getElementById('keywordSearch').value = '';
           document.getElementById('filterProductId').value = '';
+          resetAdvancedFilters();
           filterStatus('all', document.querySelector('#statusFilterGroup button'));
 
           // 跳转与执行
@@ -3863,20 +3908,12 @@ export const adminHtml = `<!DOCTYPE html>
     }
 
     // 通用复制文本
-    function copyText(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        showToast('已复制到剪贴板', 'success');
-      }).catch(() => {
-        showToast('复制失败', 'error');
-      });
-    }
-
     // API 交互函数
     async function toggleStatus(key, status) {
       const isRestore = status === 'active';
       const confirmed = await showModal({
         title: isRestore ? '🔓 恢复使用' : '🔒 吊销卡密',
-        message: '确定要' + (isRestore ? '恢复' : '吊销') + '卡密[<span style="color:var(--accent)">' + key + '</span>]吗？',
+        message: '确定要' + (isRestore ? '恢复' : '吊销') + '卡密[<span style="color:var(--accent)">' + escapeHTML(key) + '</span>]吗？',
         confirmText: '确定',
         danger: !isRestore
       });
@@ -3912,7 +3949,7 @@ export const adminHtml = `<!DOCTYPE html>
     async function deleteLic(key) {
       const confirmed = await showModal({
         title: '🗑️ 彻底停产',
-        message: '⚠️ 危险: 确定删除卡密[<span style="color:var(--danger)">' + key + '</span>]吗？此操作不可逆！',
+        message: '⚠️ 危险: 确定删除卡密[<span style="color:var(--danger)">' + escapeHTML(key) + '</span>]吗？此操作不可逆！',
         confirmText: '确认删除',
         danger: true
       });
@@ -4411,7 +4448,7 @@ export const adminHtml = `<!DOCTYPE html>
       let previewMsg = \`🚀 最终确认：是否对 \${keys.length} 个卡密执行 [\${optionText}] 操作？\`;
       if (keys.length > 50) {
         const moreText = keys.length > 100 ? '<br>... 还有 ' + (keys.length - 100) + ' 个' : '';
-        previewMsg += '<br><br><details><summary style="cursor:pointer; color:var(--accent);">查看选中的卡密列表</summary><div style="max-height:150px; overflow-y:auto; margin-top:8px; font-family:monospace; font-size:11px; background:#0d1117; padding:8px; border-radius:4px;">' + keys.slice(0, 100).join('<br>') + moreText + '</div></details>';
+        previewMsg += '<br><br><details><summary style="cursor:pointer; color:var(--accent);">查看选中的卡密列表</summary><div style="max-height:150px; overflow-y:auto; margin-top:8px; font-family:monospace; font-size:11px; background:#0d1117; padding:8px; border-radius:4px;">' + keys.slice(0, 100).map(escapeHTML).join('<br>') + moreText + '</div></details>';
       }
 
       const confirmed = await showModal({
@@ -4602,10 +4639,10 @@ export const adminHtml = `<!DOCTYPE html>
             <div style="padding:8px 12px; border-top:1px solid #30363d; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
               <div>
                 <div style="color:var(--text-bright); margin-bottom:4px;"><strong>\${safeDeviceName}</strong></div>
-                <div style="font-family:monospace; color:var(--text-main); margin-bottom:2px;">\${d.device_id}</div>
+                <div style="font-family:monospace; color:var(--text-main); margin-bottom:2px;">\${escapeHTML(d.device_id)}</div>
                 <div style="color:var(--text-main); font-size:11px;">最后在线: \${lActive}</div>
               </div>
-              <button class="secondary" style="padding:6px 10px; font-size:12px; color:var(--danger);" onclick="removeSingleDevice('\${key}', '\${d.device_id}')">强制解绑</button>
+              <button class="secondary" style="padding:6px 10px; font-size:12px; color:var(--danger);" onclick="removeSingleDevice('\${escapeJsArg(key)}', '\${escapeJsArg(d.device_id)}')">强制解绑</button>
             </div>
           \`;
         });

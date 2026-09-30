@@ -114,7 +114,7 @@ app.use('/api/*', async (c, next) => {
 
       return null;
     },
-    allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],
+    allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
   return corsMiddleware(c, next);

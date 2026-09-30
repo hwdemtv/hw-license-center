@@ -38,6 +38,11 @@ COPY --from=builder /app/src/static ./src/static
 # 环境配置预留 (可以通过 -e 覆盖)
 ENV NODE_ENV=production
 ENV PORT=3000
+# 数据持久化：SQLite 默认落在容器内部路径，重建容器会丢数据。
+# 这里显式把数据库指到 /data 并声明卷，运行时务必挂载宿主目录或命名卷，
+# 例如: docker run -v license-data:/data ...
+ENV DATABASE_PATH=/data/db.sqlite
+VOLUME ["/data"]
 
 # 暴露端口
 EXPOSE 3000

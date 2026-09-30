@@ -33,7 +33,7 @@
 ### 2. 开发与环境适配
 本项目采用 **Cloudflare Workers / Node.js 双栖架构**。在开发时请注意：
 - 数据库操作需统一使用 `src/db/adapter.ts` (`DBAdapter`)，以兼容 D1 和 SQLite。
-- 前端页面在 `src/static/` 目录下，修改后需运行 `node build-html.js` 重新编译前端静态资源注入包裹。
+- 前端页面在 `src/static/` 目录下。**注意：`adminHtml.ts` 与 `portalHtml.ts` 才是当前线上实际生效的源文件**（管理后台 UI 长期直接在 `adminHtml.ts` 中维护）；`admin.html` 是历史快照，与 `adminHtml.ts` 已严重分叉。**请勿运行 `scripts/maintenance/build-html.js`**，它会把 `admin.html` 的旧内容覆盖回去导致管理后台回滚。修改前端请直接编辑对应的 `*.html.ts` 文件（注意其中的模板字符串转义：`` \` `` `` \${ `` `` \\ `` 均为字面内容）。
 
 ### 3. 代码规范
 - 请保持与现有代码风格一致（TypeScript, 2个空格缩进）。

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, generateLicenseKey, generateOfflineLicenseKey, OfflineActivationData } from '../types';
+import { Env, generateLicenseKey, generateOfflineLicenseKey, OfflineActivationData, hasHtmlMetachars } from '../types';
 import { D1PreparedStatement } from '../db/adapter';
 import { generateOfflineToken } from '../utils/offline-activation';
 
@@ -10,6 +10,12 @@ app.post('/generate', async (c) => {
   try {
 
     const { max_devices = 2, count = 1, product_id = 'default', user_name = '', duration_days } = await c.req.json().catch(() => ({}));
+
+    // 防御：数量与设备上限收敛（与批量操作一致，防资源耗尽）
+    const safeCount = Math.min(500, Math.max(1, parseInt(count) || 1));
+    const safeMaxDevices = Math.min(500, Math.max(1, parseInt(max_devices) || 2));
+    const safeUserName = String(user_name || '').substring(0, 150);
+
     const generatedKeys: string[] = [];
     const statements: D1PreparedStatement[] = [];
 
@@ -20,7 +26,7 @@ app.post('/generate', async (c) => {
     }
 
     // 批量生成卡密并构建语句
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < safeCount; i++) {
       const newKey = generateLicenseKey(product_id || 'KEY');
       generatedKeys.push(newKey);
 
@@ -28,7 +34,7 @@ app.post('/generate', async (c) => {
       statements.push(
         c.env.DB.prepare(
           `INSERT INTO Licenses(license_key, product_id, user_name, status, max_devices) VALUES(?, ?, ?, 'inactive', ?)`
-        ).bind(newKey, product_id, user_name, max_devices)
+        ).bind(newKey, product_id, safeUserName, safeMaxDevices)
       );
 
       // 2. 插入对应的 Subscriptions 记录（记录期限而非固定时间点）
@@ -44,7 +50,7 @@ app.post('/generate', async (c) => {
 
     return c.json({
       success: true,
-      msg: `成功生成 ${count} 个激活码`,
+      msg: `成功生成 ${safeCount} 个激活码`,
       keys: generatedKeys
     });
 
@@ -688,6 +694,8 @@ app.post('/licenses/import', async (c) => {
       if (!lic.license_key) continue;
       // 超长卡密跳过，防撑爆
       if (String(lic.license_key).length > 100) continue;
+      // 含 HTML 元字符的卡密跳过（纵深防御，防止恶意 CSV 注入管理后台）
+      if (hasHtmlMetachars(lic.license_key)) continue;
 
       // 1. Upsert 到 Licenses 表
       statements.push(

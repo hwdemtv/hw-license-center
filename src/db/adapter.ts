@@ -50,6 +50,32 @@ export interface D1PreparedStatement {
     __nativeDbPromise?: Promise<any> | null;
 }
 
+// Node 环境下的共享连接单例：DBAdapter 会在每个请求中被构造一次，
+// 若每次都 new Database 会造成"每请求一个 SQLite 连接"，导致文件句柄与性能问题。
+let sharedNativeDbPromise: Promise<any> | null = null;
+
+function getNativeDbPromise(): Promise<any> | null {
+    if (!betterSqlite3Promise) return null;
+    if (!sharedNativeDbPromise) {
+        sharedNativeDbPromise = betterSqlite3Promise.then(Database => {
+            if (!Database) {
+                console.warn('⚠️ better-sqlite3 module not loaded dynamically. Ensure you have installed it for VPS deployment.');
+                return null;
+            }
+            const dbPath = getDatabasePath();
+            console.log(`[DBAdapter] 使用数据库路径: ${dbPath}`);
+            const db = new Database(dbPath, { fileMustExist: false });
+            db.pragma('journal_mode = WAL');
+            db.pragma('synchronous = NORMAL');
+            db.pragma('cache_size = -64000');
+            db.pragma('foreign_keys = ON');
+            db.pragma('busy_timeout = 5000');
+            return db;
+        });
+    }
+    return sharedNativeDbPromise;
+}
+
 export class DBAdapter {
     private d1Db: any = null;
     private nativeDbPromise: Promise<any> | null = null;
@@ -57,22 +83,8 @@ export class DBAdapter {
     constructor(envDb?: any) {
         if (envDb && typeof envDb.prepare === 'function') {
             this.d1Db = envDb;
-        } else if (betterSqlite3Promise) {
-            this.nativeDbPromise = betterSqlite3Promise.then(Database => {
-                if (!Database) {
-                    console.warn('⚠️ better-sqlite3 module not loaded dynamically. Ensure you have installed it for VPS deployment.');
-                    return null;
-                }
-                const dbPath = getDatabasePath();
-                console.log(`[DBAdapter] 使用数据库路径: ${dbPath}`);
-                const db = new Database(dbPath, { fileMustExist: false });
-                db.pragma('journal_mode = WAL');
-                db.pragma('synchronous = NORMAL');
-                db.pragma('cache_size = -64000');
-                db.pragma('foreign_keys = ON');
-                db.pragma('busy_timeout = 5000');
-                return db;
-            });
+        } else {
+            this.nativeDbPromise = getNativeDbPromise();
         }
     }
 

@@ -61,7 +61,28 @@ app.post('/pay', async (c) => {
         } = body;
 
         const safeCount = Math.min(50, Math.max(1, parseInt(count) || 1));
-        const safeMaxDevices = Math.max(1, parseInt(max_devices) || 1);
+        const safeMaxDevices = Math.min(500, Math.max(1, parseInt(max_devices) || 1));
+
+        // 幂等保护：发卡平台重试回调同一订单时，直接返回首次生成的卡密，避免重复发卡。
+        // 依据：/pay 将订单号写入 user_name 备注字段，可按 (订单号, 产品) 反查。
+        // 注意：未显式传订单号（默认 webhook_auto）的调用不参与幂等，避免互相串单。
+        const isExplicitOrder = typeof out_trade_no === 'string' && out_trade_no !== 'webhook_auto';
+        if (isExplicitOrder) {
+            const { results: existing } = await c.env.DB.prepare(
+                `SELECT license_key FROM Licenses WHERE user_name = ? AND product_id = ? ORDER BY created_at LIMIT 50`
+            ).bind(out_trade_no, product_id).all();
+            if (existing.length > 0) {
+                const existingKeys = (existing as any[]).map(r => r.license_key);
+                return c.json({
+                    success: true,
+                    msg: 'duplicate callback, original keys returned',
+                    order_no: out_trade_no,
+                    keys: existingKeys,
+                    text_result: existingKeys.join('\n'),
+                    idempotent: true
+                });
+            }
+        }
 
         const generatedKeys: string[] = [];
         const statements: any[] = [];

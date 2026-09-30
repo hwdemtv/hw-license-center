@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, License, Device, Subscription } from '../types';
+import { Env, License, Device, Subscription, hasHtmlMetachars } from '../types';
 import { sign } from 'hono/jwt';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -15,6 +15,11 @@ app.post('/verify', async (c) => {
     // 防御性拦截：保护核心检索字段不超长，防止恶意攻击查库
     if (String(license_key).length > 128 || String(device_id).length > 128) {
       return c.json({ success: false, msg: '验证失败：核心参数长度超限' }, 400);
+    }
+
+    // 纵深防御：标识符不允许携带 HTML 元字符（防存储型 XSS）
+    if (hasHtmlMetachars(license_key) || hasHtmlMetachars(device_id)) {
+      return c.json({ success: false, msg: '验证失败：参数包含非法字符' }, 400);
     }
 
     // 防御性温和截断：对非检索展示字段仅截取有效部分，兼容各种旧版客户端
@@ -256,6 +261,10 @@ app.post('/unbind', async (c) => {
       return c.json({ success: false, msg: '参数长度超限' }, 400);
     }
 
+    if (hasHtmlMetachars(license_key) || hasHtmlMetachars(device_id)) {
+      return c.json({ success: false, msg: '参数包含非法字符' }, 400);
+    }
+
     // --- Phase 12: C 端解绑额度风控逻辑 ---
     // 1. 查询激活码当前风控状态
     const licenseResult = await c.env.DB.prepare(
@@ -267,8 +276,8 @@ app.post('/unbind', async (c) => {
     }
 
     const now = new Date();
-    // 格式化为 YYYY-MM 周期标识 (东八区简单处理)
-    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // 格式化为 YYYY-MM 周期标识（统一使用 UTC，与 /portal/devices 的计算保持一致）
+    const currentPeriod = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     let unbindCount = licenseResult.unbind_count as number || 0;
     const lastPeriod = licenseResult.last_unbind_period as string;
 
@@ -324,6 +333,10 @@ app.get('/portal/devices', async (c) => {
 
     if (String(key).length > 128) {
       return c.json({ success: false, msg: '参数长度超限' }, 400);
+    }
+
+    if (hasHtmlMetachars(key)) {
+      return c.json({ success: false, msg: '参数包含非法字符' }, 400);
     }
 
     // 查询该卡是否合法

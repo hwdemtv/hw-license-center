@@ -16,8 +16,7 @@
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
     "esbuild": "^0.27.3",
-    "hono": "^4.12.2",
-    "typescript": "^5.9.3"
+    "hono": "^4.12.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260305.0",
@@ -26,6 +25,7 @@
     "@vitest/ui": "^4.0.18",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "wrangler": "^4.69.0"
   }
