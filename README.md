@@ -1,5 +1,9 @@
 # hw-license-center (互为卡密中心)
 
+![License](https://img.shields.io/badge/License-MIT-blue) ![Platform](https://img.shields.io/badge/Platform-Cloudflare%20Workers%20%7C%20Node.js-orange) ![Framework](https://img.shields.io/badge/Framework-Hono-purple) ![Language](https://img.shields.io/badge/Language-TypeScript-3178c6)
+
+> **License key & activation code management center** — software licensing, device binding, JWT auth & AI gateway on Cloudflare Workers (D1) or Node.js.
+
 这是由 **hwdemtv** 团队精心打造的一套基于 **Cloudflare Workers (D1)** 与 **Node.js (Better-SQLite3)** 双栖架构的轻量级、高安全且易于部署的软件激活码（卡密）认证中控系统。
 
 ---
@@ -39,7 +43,7 @@
 - **核心框架**: [Hono](https://hono.dev/)
 - **逻辑层**: TypeScript
 - **数据库隔离层**: 自研 **DBAdapter** (D1 / Better-SQLite3)
-- **UI 引擎**: Vanilla JS + CSS Grid (零依赖、零由于)
+- **UI 引擎**: Vanilla JS + CSS Grid (零依赖、零构建)
 - **部署工具**: Wrangler / PM2 / Docker
 
 ---
@@ -57,7 +61,7 @@
 | **安全** | [🔐 安全策略与审计报告](./docs/SECURITY.md) | 包含 XSS、CORS 与限流器的加固详情 |
 | **回顾** | [📅 研发里程碑回顾](./docs/DEVELOPMENT_RETROSPECTIVE.md) | Phase 1-27 详尽研发历程总结 |
 | **展望** | [🛤️ 路线图与潜在风险](./docs/ROADMAP_AND_RISKS.md) | 技术债分析与中长期优化方向 |
-| **SDK**  | **[📦 hw-auth-client](file:///../../packages/hw-auth-client)** | **官方推荐的 TypeScript SDK，支持多域名容灾与静默授权** |
+| **SDK**  | 📦 hw-auth-client (规划中) | 官方 TypeScript SDK，规划支持多域名容灾与静默授权 |
 
 ---
 
@@ -75,7 +79,7 @@
 3. 生产打包：`npm run build:node`。
 4. 守护启动：`pm2 start dist/server.js --name "km-center"`。
 
-> 📘 详细文档参考：[双栖部署指南 (DUAL_DEPLOYMENT.md)](./DUAL_DEPLOYMENT.md)
+> 📘 详细文档参考：[双栖部署指南 (docs/DUAL_DEPLOYMENT.md)](./docs/DUAL_DEPLOYMENT.md)
 
 ---
 
